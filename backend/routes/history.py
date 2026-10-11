@@ -17,11 +17,11 @@ SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
 # ---------------------------------------------------------
 def format_history_images(record):
     if record and record.get("Image_Path"):
-        path = record["Image_Path"]
-        if not path.startswith("http"):
-            filename = path.split("/")[-1]
-            record["Image_Path"] = f"{SERVER_URL}/uploads/{filename}"
-            record["Res_Image_Path"] = f"{SERVER_URL}/uploads/res_{filename}"
+        image_path = record["Image_Path"]
+        filename = image_path.split("/")[-1]
+        record["Image_Path"] = f"{SERVER_URL}/analysis/secure-image/{filename}"
+        record["Res_Image_Path"] = f"{SERVER_URL}/analysis/secure-image/res_{filename}"
+        
     return record
 
 # ---------------------------------------------------------
