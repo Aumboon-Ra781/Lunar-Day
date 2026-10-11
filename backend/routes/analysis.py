@@ -11,7 +11,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 import mysql.connector
 from config.database import get_db_connection
 from PIL import Image, ImageDraw, ImageFont
-
+import uuid
 # ==============================
 # INIT
 # ==============================
@@ -521,8 +521,8 @@ def analyze_image():
                 400,
             )
         # ===== SAVE IMAGE =====
-        timestamp = int(time.time())
-        filename = f"user_{current_user_id}_{timestamp}.jpg"
+        unique_id = uuid.uuid4().hex
+        filename = f"user_{current_user_id}_{unique_id}.jpg"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
         with open(filepath, "wb") as f:
@@ -767,7 +767,7 @@ def analyze_risk():
         db.commit()
         assessment_id = cursor.lastrowid
 
-        # ถ้าคะแนนไม่ถึงเกณฑ์ แนบ error_code: "A7" ไปบอกหน้าบ้าน เพื่อให้พุ่งไปหน้า result ทันที
+    
         response_error_code = "A7" if not results else None
 
         return (
@@ -776,7 +776,7 @@ def analyze_risk():
                     "status": "success",
                     "error_code": response_error_code,
                     "assessment_id": assessment_id,
-                    "msg": "บันทึกข้อมูลเรียบร้อยแล้ว",
+                    "msg": "ไม่พบโรคที่สอดคล้องกับอาการที่ระบุ",
                     "data": {
                         "detect1": detect1,
                         "detect2": detect2,
@@ -844,7 +844,7 @@ def get_assessment_result(assessment_id):
 
     except mysql.connector.Error as err:
         logger.error(f"Database Error: {err}")
-        return jsonify({"status": "error_code":"A11",, "msg": "ไม่สามารถดูผลวิเคราะห์ กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({"status" : "errpr","error_code":"A11", "msg": "ไม่สามารถดูผลวิเคราะห์ กรุณาลองใหม่อีกครั้ง"}), 500
     except Exception as e:
         logger.error(f"System Error: {e}")
         return jsonify({"status": "error", "error_code":"A10","msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
