@@ -21,7 +21,18 @@ app = Flask(__name__)
 
 
 # --- 1. ตั้งค่า CORS ---
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "http://192.168.1.16:3000"
+            ]
+        }
+    }
+)
+
 
 # --- 2. ตั้งค่าระบบความปลอดภัย (JWT) ---
 app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
