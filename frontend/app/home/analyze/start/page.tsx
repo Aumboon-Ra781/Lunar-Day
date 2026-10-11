@@ -312,7 +312,8 @@ function CheckboxGroup({
 export default function AnalyzePage() {
   const [mounted,    setMounted]   = useState(false)
   const [step,       setStep]      = useState<Step>('upload')
-  const [image,      setImage]     = useState<string | null>(null)
+  const [image,      setImage]     = useState<string | null>(null)   // ภาพจากเครื่อง (แสดงในหน้าอัปโหลด)
+  const [aiImage,    setAiImage]   = useState<string | null>(null)   // ภาพที่ AI วาดกรอบ (แสดงในหน้าระบุอาการ)
   const [dragOver,   setDragOver]  = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const uploadSeq = useRef(0)  // นับรอบการเลือกรูป กันผลของรูปเก่ามาทับรูปใหม่
@@ -333,11 +334,11 @@ export default function AnalyzePage() {
     if (!file.type.startsWith('image/')) return
     setImageValidated(false)
     setImageResult(null)
+    setAiImage(null)
     const seq = ++uploadSeq.current
-    let showingVisual = false  // แสดงภาพผล AI แล้ว → ภาพตัวอย่างจากเครื่องไม่ต้องทับ
     const reader = new FileReader()
     reader.onload = e => {
-      if (uploadSeq.current === seq && !showingVisual) setImage(e.target?.result as string)
+      if (uploadSeq.current === seq) setImage(e.target?.result as string)
     }
     reader.readAsDataURL(file)
 
@@ -371,14 +372,13 @@ export default function AnalyzePage() {
       } else {
         setImageResult(data); setImageValidated(true)
         if (data.visual_path) {
-          // โหลดภาพผล AI ให้เสร็จก่อนค่อยสลับ ถ้าโหลดไม่ได้ให้คงภาพตัวอย่างจากเครื่องไว้
-          // (ไม่สลับไปที่ URL ตรง ๆ เพราะถ้าโหลดพลาดจะเหลือกรอบรูปเสีย)
+          // โหลดภาพผล AI ให้เสร็จก่อนค่อยใช้ในหน้าระบุอาการ ถ้าโหลดไม่ได้ให้ใช้ภาพจากเครื่องแทน
+          // (หน้าอัปโหลดแสดงภาพจากเครื่องเสมอ)
           const visualUrl = backendUrl(data.visual_path)
           const probe = new window.Image()
           probe.onload = () => {
             if (uploadSeq.current !== seq) return
-            showingVisual = true
-            setImage(visualUrl)
+            setAiImage(visualUrl)
           }
           probe.src = visualUrl
         }
@@ -479,7 +479,7 @@ export default function AnalyzePage() {
   const rc = getRiskLevel(riskResult?.Risk_Level) ?? NO_MATCH_STYLE
 
   const resetAll = () => {
-    setStep('upload'); setImage(null)
+    setStep('upload'); setImage(null); setAiImage(null)
     setImageResult(null); setRiskResult(null); setImageLoading(false)
     setForm(EMPTY_FORM)
     setImageValidated(false)
@@ -668,7 +668,9 @@ export default function AnalyzePage() {
         /* ── Desktop: wider two-column layouts ── */
         @media (min-width: 769px) {
           .result-detail { grid-template-columns: 1fr 1fr; }
-          .rd-row:nth-last-child(2) { border-bottom: none; }
+          /* จำนวนแถวคู่: แถวคู่สุดท้ายไม่มีเส้นล่าง / จำนวนคี่: แถวสุดท้ายเต็มความกว้าง */
+          .rd-row:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+          .rd-row:last-child:nth-child(odd) { grid-column: 1 / -1; }
           .upload-zone { min-height: 280px; }
         }
 
@@ -807,7 +809,7 @@ export default function AnalyzePage() {
                         <CheckCircle2 size={12} color="#c2185b" /> ภาพพร้อมวิเคราะห์
                       </div>
                     </div>
-                    <button className="img-remove-btn" onClick={() => { setImage(null) }}>
+                    <button className="img-remove-btn" onClick={() => { setImage(null); setAiImage(null) }}>
                       <X size={13} color="#fff" />
                     </button>
                   </div>
@@ -841,13 +843,13 @@ export default function AnalyzePage() {
                   </div>
                 </div>
 
-                {/* ภาพที่อัปโหลด (เมื่อ AI ตรวจเสร็จจะเป็นภาพที่ AI ทำเครื่องหมายไว้) */}
-                {image && (
+                {/* ภาพที่ AI วิเคราะห์ (ภาพที่วาดกรอบผล AI — ถ้ายังไม่มีใช้ภาพจากเครื่อง) */}
+                {(aiImage ?? image) && (
                   <div className="img-preview img-preview--symptoms">
-                    <img src={image} alt="ภาพที่อัปโหลด" />
+                    <img src={(aiImage ?? image)!} alt="ภาพที่ AI วิเคราะห์" />
                     <div className="img-preview-overlay">
                       <div className="img-preview-tag">
-                        <ImageIcon size={12} color="#c2185b" /> ภาพที่อัปโหลด
+                        <ImageIcon size={12} color="#c2185b" /> ภาพที่ AI วิเคราะห์
                       </div>
                     </div>
                   </div>
@@ -977,11 +979,8 @@ export default function AnalyzePage() {
                 <div className="result-detail">
                   <div className="rd-row">
                     <div className="rd-icon">🩸</div>
-                    <div><div className="rd-label">ผลการวิเคราะห์ภาพ (AI)</div><div className="rd-value">{riskResult.Detect1}</div></div>
-                  </div>
-                  <div className="rd-row">
-                    <div className="rd-icon">🔬</div>
-                    <div><div className="rd-label">รายละเอียดที่พบ</div><div className="rd-value">{riskResult.Detect2}</div></div>
+                    {/* Detect2 = ผลภาพที่ละเอียดกว่า (เช่น รวมขนาดลิ่มเลือด) — ไม่มีจึงใช้ Detect1 */}
+                    <div><div className="rd-label">ผลการวิเคราะห์ภาพ (AI)</div><div className="rd-value">{riskResult.Detect2 || riskResult.Detect1}</div></div>
                   </div>
                   {imageResult && (
                     <div className="rd-row">

@@ -1001,7 +1001,10 @@ export default function ProfilePage() {
         .pf-detail-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .pf-detail-row { display: flex; gap: 14px; padding: 16px 20px; border-bottom: 1px solid #f5e6ec; }
         .pf-detail-row:nth-child(odd) { border-right: 1px solid #f5e6ec; }
-        .pf-detail-row:last-child { grid-column: 1 / -1; border-right: none; border-bottom: none; }
+        .pf-detail-row:last-child { border-bottom: none; }
+        /* จำนวนแถวคี่: แถวสุดท้ายเต็มความกว้าง / จำนวนคู่: แถวคู่สุดท้ายไม่มีเส้นล่าง */
+        .pf-detail-row:last-child:nth-child(odd) { grid-column: 1 / -1; border-right: none; }
+        .pf-detail-row:nth-last-child(2):nth-child(odd) { border-bottom: none; }
         .pf-reco-grid {
           display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
         }
@@ -1353,8 +1356,8 @@ function HistoryDetailView({ item, onBack }: { item: HistoryItem; onBack: () => 
   const cfg = riskStyle(detail.Risk_Level)
 
   const rows = [
-    { label: 'ผลการวิเคราะห์ภาพ (AI)', value: detail.Detect1, emoji: '🩸' },
-    { label: 'รายละเอียดที่พบ',         value: detail.Detect2, emoji: '🔬' },
+    // Detect2 = ผลภาพที่ละเอียดกว่า (เช่น รวมขนาดลิ่มเลือด) — ไม่มีจึงใช้ Detect1
+    { label: 'ผลการวิเคราะห์ภาพ (AI)', value: detail.Detect2 || detail.Detect1, emoji: '🩸' },
     { label: 'โรคที่อาจเกี่ยวข้อง',    value: detail.Potential_Disease, emoji: '🎯' },
     { label: 'ระดับความเสี่ยง',         value: detail.Risk_Level, emoji: '📊' },
     { label: 'วันที่วิเคราะห์', value:
