@@ -19,15 +19,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# ---------------------------------------------------------
-# Route สำหรับดึงรูปภาพที่อัปโหลดไว้ 
-# ---------------------------------------------------------
-@app.route("/uploads/<filename>", methods=["GET"])
-def get_uploaded_image(filename):
-    try:
-        return send_from_directory(UPLOAD_FOLDER, filename)
-    except Exception as e:
-        return {"error": "File not found"}, 404
 
 # --- 1. ตั้งค่า CORS ---
 CORS(app, resources={r"/*": {"origins": "*"}})
