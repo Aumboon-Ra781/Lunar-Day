@@ -375,8 +375,8 @@ def reset_password():
         data = request.get_json(silent=True) or {}
         email = str(data.get("email") or "").strip()
         otp = str(data.get("otp") or "").strip()
-        new_password = str(data.get("newPassword", "")).strip()
-        confirm_password = str(data.get("confirmPassword", "")).strip()
+        new_password = str(data.get("newPassword", ""))
+        confirm_password = str(data.get("confirmPassword", ""))
 
         # เช็คค่าว่าง
         if not all([email, otp, new_password, confirm_password]):
