@@ -217,71 +217,92 @@ def login():
 
 # --- Configuration (ระบบส่งเมล) ---
 GMAIL_USER1 = os.environ.get("GMAIL_USER1")
-GMAIL_USER2 = os.environ.get("GMAIL_USER2")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
-PW_OTP1 =os.environ.get("PW_OTP1")
-PW_OTP2 =os.environ.get("PW_OTP2")
 
 # ==========================================
 # 🔑 Forgot Password
 # ==========================================
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
-
     db = None
     cursor = None
-    try: 
+
+    generic_response = {
+        "status": "success",
+        "msg": (
+            "หากอีเมลนี้ลงทะเบียนไว้ คุณจะได้รับรหัส OTP "
+            "สำหรับรีเซ็ตรหัสผ่านทางอีเมล กรุณาตรวจสอบอีเมลของคุณ"
+        )
+    }
+
+    try:
         data = request.get_json(silent=True) or {}
-        email = str(data.get("email", "")).strip()
-        
+        email = str(data.get("email") or "").strip()
+
+        # ตรวจสอบว่ากรอกอีเมลหรือไม่
         if not email:
-            return jsonify({"status": "error", "error_code": "O9", "msg": "กรุณากรอกอีเมล"}), 400
-        
+            return jsonify({
+                "status": "error",
+                "error_code": "O9",
+                "msg": "กรุณากรอกอีเมล"
+            }), 400
+
         db = get_db_connection()
+
+        if not db:
+            logger.error("Forgot Password: Database connection failed")
+            return jsonify({
+                "status": "error",
+                "error_code": "O11",
+                "msg": "ระบบไม่สามารถดำเนินการได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"
+            }), 500
+
         cursor = db.cursor(dictionary=True, buffered=True)
 
-        # ตรวจสอบอีเมลในระบบ
-        cursor.execute("SELECT UserID FROM User WHERE Email = %s", (email,))
+        # ค้นหาอีเมลในระบบ
+        cursor.execute(
+            "SELECT UserID FROM User WHERE Email = %s",
+            (email,)
+        )
         user = cursor.fetchone()
 
+        # ไม่พบอีเมล ให้ตอบกลับเหมือนกรณีพบอีเมล
         if not user:
-            return jsonify({"status": "error","error_code": "O1","msg": "ไม่พบอีเมลนี้ในระบบ"}), 404
-        if email == GMAIL_USER1:
-            otp = PW_OTP1
-            expire_time = datetime.now() + timedelta(minutes=5)
-        elif email == GMAIL_USER2:
-            otp = PW_OTP2
-            expire_time = datetime.now() - timedelta(minutes=5)
-        else:
-            otp = str(random.randint(100000, 999999))
-            expire_time = datetime.now() + timedelta(minutes=5)
+            return jsonify(generic_response), 200
 
-        # บันทึก OTP + เวลาหมดอายุ
+        # สร้าง OTP และกำหนดวันหมดอายุ
+        # ใช้ OTP แบบสุ่มที่ปลอดภัยสำหรับบัญชีผู้ใช้ทั่วไป
+        import secrets
+
+        otp = f"{secrets.randbelow(900000) + 100000}"
+        expire_time = datetime.now() + timedelta(minutes=5)
+
+        # บันทึก OTP และเวลาหมดอายุ
         cursor.execute(
             """
-            UPDATE User 
-            SET ResetOTP = %s, OTPExpireTime = %s 
-            WHERE Email = %s
+            UPDATE User
+            SET ResetOTP = %s, OTPExpireTime = %s
+            WHERE UserID = %s
             """,
-            (otp, expire_time, email),
+            (otp, expire_time, user["UserID"])
         )
         db.commit()
 
-        # ---------------- ส่งอีเมล ----------------
+        # เตรียมอีเมล OTP
         subject = "Luna Day - Password Reset Verification Code"
+
         body = f"""
 เรียน ผู้ใช้งาน Luna Day
+
 มีการร้องขอให้รีเซ็ตรหัสผ่านสำหรับบัญชีของคุณ
 
-รหัส OTP สำหรับยืนยันตัวตนคือ
-รหัส OTP ของคุณคือ: 
-{otp}
+รหัส OTP สำหรับยืนยันตัวตนคือ: {otp}
 
-    • รหัสนี้มีอายุการใช้งาน 5 นาที
-    • โปรดใช้รหัสนี้เพื่อดำเนินการเปลี่ยนรหัสผ่าน
-    • ห้ามเปิดเผยรหัส OTP แก่บุคคลอื่น
+- รหัสนี้มีอายุการใช้งาน 5 นาที
+- โปรดใช้รหัสนี้เพื่อดำเนินการเปลี่ยนรหัสผ่าน
+- ห้ามเปิดเผยรหัส OTP แก่บุคคลอื่น
 
-หากคุณไม่ได้เป็นผู้ร้องขอ โปรดละเว้นอีเมลฉบับนี้ บัญชีของคุณจะไม่ได้รับผลกระทบหากไม่มีการยืนยันรหัส OTP
+หากคุณไม่ได้เป็นผู้ร้องขอ โปรดละเว้นอีเมลฉบับนี้
 
 ขอแสดงความนับถือ
 Luna Day Team
@@ -292,24 +313,52 @@ Luna Day Team
         msg["From"] = f"Luna Day Team <{GMAIL_USER1}>"
         msg["To"] = email
 
+        # ส่งอีเมล OTP
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_USER1, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_USER1, email, msg.as_string())
+            server.sendmail(
+                GMAIL_USER1,
+                email,
+                msg.as_string()
+            )
 
-        return jsonify({"status": "success","msg": "ส่งรหัส OTP ไปยังอีเมลของคุณเรียบร้อยแล้ว"}), 200
+        # กรณีส่งอีเมลสำเร็จ
+        return jsonify(generic_response), 200
 
-    except mysql.connector.Error as err:
-        logger.error(f"Database Error: {err}")
-        return jsonify({"status": "error","error_code": "O11","msg": "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"}), 500
-    except smtplib.SMTPException as em:
-        logger.error(f"Email Error: {em}")
-        return jsonify({"status": "error","error_code": "O13","msg": "เกิดปัญหาในการส่งอีเมล กรุณาลองใหม่อีกครั้งภายหลัง"}), 500
-    except Exception as e:
-        logger.error(f"System Error: {e}")
-        return jsonify({"status": "error","error_code": "O12","msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
+    except mysql.connector.Error:
+        if db is not None:
+            db.rollback()
+
+        logger.exception("Forgot Password: Database error")
+
+        return jsonify({
+            "status": "error",
+            "error_code": "O11",
+            "msg": "ระบบไม่สามารถดำเนินการได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"
+        }), 500
+
+    except smtplib.SMTPException:
+        logger.exception("Forgot Password: Email delivery error")
+
+        return jsonify({
+            "status": "error",
+            "error_code": "O13",
+            "msg": "ไม่สามารถดำเนินการได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"
+        }), 500
+
+    except Exception:
+        logger.exception("Forgot Password: Unexpected error")
+
+        return jsonify({
+            "status": "error",
+            "error_code": "O12",
+            "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"
+        }), 500
+
     finally:
         if cursor is not None:
             cursor.close()
+
         if db is not None:
             db.close()
             
