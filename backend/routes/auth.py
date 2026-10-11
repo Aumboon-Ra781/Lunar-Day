@@ -28,8 +28,8 @@ def register():
     try:           
         data = request.get_json(silent=True) or {}
         username = str(data.get("username", "")).strip()
-        password = str(data.get("password", "")).strip()
-        confirm_pw = str(data.get("confirmPassword", "")).strip()
+        password = str(data.get("password", ""))
+        confirm_pw = str(data.get("confirmPassword", ""))
         name = str(data.get("firstName", "")).strip()
         lastname = str(data.get("lastName", "")).strip()
         birthday = str(data.get("birthDate", "")).strip()
@@ -103,11 +103,11 @@ def register():
 
     except mysql.connector.Error as err:
         logger.error(f"Database Error: {err}")
-        return jsonify({"status": "error","erroe_code":"R13","msg": "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({"status": "error","error_code":"R13","msg": "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"}), 500
 
     except Exception as e:
         logger.error(f"System Error: {e}")
-        return jsonify({"status": "error","erroe_code":"R14","msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({"status": "error","error_code":"R14","msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
         
     finally:
         if cursor is not None:
@@ -126,7 +126,7 @@ def login():
     try:
         data = request.get_json(silent=True) or {}
         username = str(data.get("username", "")).strip()
-        password = str(data.get("password", "")).strip()
+        password = str(data.get("password", ""))
 
         if not username or not password:
             return jsonify({"status":"error","error_code":"A2","msg": "กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
