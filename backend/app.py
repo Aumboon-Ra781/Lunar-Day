@@ -24,9 +24,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # --- 2. ตั้งค่าระบบความปลอดภัย (JWT) ---
-app.config["JWT_SECRET_KEY"] = os.environ.get(
-    "JWT_SECRET_KEY", "luna-day-default-secret-key-2026-secure"
-)
+app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
@@ -66,7 +64,10 @@ def index():
         "status": "success",
     }, 200
 
-
 if __name__ == "__main__":
-    # รันบนพอร์ต 5000 และเปิด host เป็น 0.0.0.0 เพื่อให้เพื่อนในวง LAN เดียวกันเข้าได้
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(
+        debug=False,
+        host="0.0.0.0",
+        port=5000,
+        use_reloader=False
+    )
