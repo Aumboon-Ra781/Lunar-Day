@@ -623,13 +623,13 @@ def analyze_image():
 
         # เซฟภาพที่วาดเส้นแล้วลงในโฟลเดอร์ uploads
         cv2.imwrite(res_filepath, cv2.cvtColor(img_visual, cv2.COLOR_RGB2BGR))
-        base_url = request.host_url
+        base_url = request.host_url.rstrip("/") + "/analysis/"
         return jsonify(
             {
                 "status": "success",
                 "ai_result": ai_res,
-                "image_path": f"{base_url}analysis/secure-image/{filename}",
-                "visual_path": f"{base_url}analysis/secure-image/{res_filename}",
+                "image_path": f"{base_url}uploads/{filename}",
+                "visual_path": f"{base_url}uploads/{res_filename}",
                 "detect_label": AI_RESULT_TH.get(ai_res, ai_res),
                 "confidence": round(avg_conf * 100, 2),
                 #"processing_time": round(time.time() - start_time, 2),
@@ -857,7 +857,7 @@ def get_assessment_result(assessment_id):
 # ==============================
 # 🛡️ API สำหรับขอดูรูป 
 # ==============================
-@analysis_bp.route("/secure-image/<filename>", methods=["GET"])
+@analysis_bp.route("/uploads/<filename>", methods=["GET"])
 @jwt_required()
 def get_secure_image(filename):
     try:

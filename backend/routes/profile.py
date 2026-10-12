@@ -57,7 +57,7 @@ def get_profile():
             
             if user.get("Profile_Image"):
                 profile_filename = user["Profile_Image"]
-                user["Profile_Image"] = f"{SERVER_URL}/profile/secure-image/{profile_filename}"
+                user["Profile_Image"] = f"{SERVER_URL}/profile/uploads/{profile_filename}"
                 
             return jsonify({"status": "success", "data": user}), 200
         return jsonify({"status": "error", "error_code": "P11", "msg": "ไม่พบข้อมูลผู้ใช้"}), 404
@@ -341,9 +341,9 @@ def logout():
         if db:
             db.close()
 # ---------------------------------------------------------
-# 5. GET: ดึงรูปโปรไฟล์แบบปลอดภัย (ต้องมี Token และป้องกัน IDOR)
+# 5. GET: ดึงรูปโปรไฟล์แบบปลอดภัย 
 # ---------------------------------------------------------
-@profile_bp.route("/secure-image/<filename>", methods=["GET"])
+@profile_bp.route("/uploads/<filename>", methods=["GET"])
 @jwt_required()
 def get_secure_profile_image(filename):
     try:

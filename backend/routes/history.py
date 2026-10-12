@@ -5,7 +5,6 @@ import mysql.connector
 import logging
 import os 
 
-
 history_bp = Blueprint("history", __name__)
 logger = logging.getLogger(__name__)
 
@@ -20,8 +19,8 @@ def format_history_images(record):
     if record and record.get("Image_Path"):
         image_path = record["Image_Path"]
         filename = image_path.split("/")[-1]
-        record["Image_Path"] = f"{SERVER_URL}/analysis/secure-image/{filename}"
-        record["Res_Image_Path"] = f"{SERVER_URL}/analysis/secure-image/res_{filename}"
+        record["Image_Path"] = f"{SERVER_URL}/analysis/uploads/{filename}"
+        record["Res_Image_Path"] = f"{SERVER_URL}/analysis/uploads/res_{filename}"
         
     return record
 
