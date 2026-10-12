@@ -265,13 +265,9 @@ def forgot_password():
             (email,)
         )
         user = cursor.fetchone()
-
-        # ไม่พบอีเมล ให้ตอบกลับเหมือนกรณีพบอีเมล
         if not user:
             return jsonify(generic_response), 200
 
-        # สร้าง OTP และกำหนดวันหมดอายุ
-        # ใช้ OTP แบบสุ่มที่ปลอดภัยสำหรับบัญชีผู้ใช้ทั่วไป
         import secrets
 
         otp = f"{secrets.randbelow(900000) + 100000}"
