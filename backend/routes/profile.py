@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROFILE_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads", "profiles")
 os.makedirs(PROFILE_UPLOAD_FOLDER, exist_ok=True)
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
+
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
-
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
 # กำหนดขนาดไฟล์สูงสุด 10MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -53,13 +53,11 @@ def get_profile():
 
         if user:
             if user["Birthday"]:
-                user["Birthday"] = user["Birthday"].strftime("%Y-%m-%d")
-            
-            if user.get("Profile_Image"):
-                profile_filename = user["Profile_Image"]
-                user["Profile_Image"] = f"{SERVER_URL}/profile/uploads/{profile_filename}"
-                
+                user["Birthday"] = user["Birthday"].strftime("%Y-%m-%d")              
             return jsonify({"status": "success", "data": user}), 200
+            if user.get("Profile_Image"):
+                
+                user["Profile_Image"] = f"{SERVER_URL}/static/uploads/profiles/{user['Profile_Image']}
         return jsonify({"status": "error", "error_code": "P11", "msg": "ไม่พบข้อมูลผู้ใช้"}), 404
 
     except mysql.connector.Error as err:
@@ -340,20 +338,3 @@ def logout():
             cursor.close()
         if db:
             db.close()
-# ---------------------------------------------------------
-# 5. GET: ดึงรูปโปรไฟล์แบบปลอดภัย 
-# ---------------------------------------------------------
-@profile_bp.route("/uploads/<filename>", methods=["GET"])
-@jwt_required()
-def get_secure_profile_image(filename):
-    try:
-        current_user_id = str(get_jwt_identity())
-        safe_filename = secure_filename(filename)
-    
-        if not safe_filename.startswith(f"profile_{current_user_id}_"):
-            return jsonify({"status": "error", "msg": "คุณไม่มีสิทธิ์เข้าถึงรูปโปรไฟล์นี้"}), 403
-
-        return send_from_directory(PROFILE_UPLOAD_FOLDER, safe_filename)
-        
-    except Exception as e:
-        return jsonify({"status": "error", "msg": "ไม่พบไฟล์รูปโปรไฟล์"}), 404
