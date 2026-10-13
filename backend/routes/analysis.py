@@ -623,13 +623,13 @@ def analyze_image():
 
         # เซฟภาพที่วาดเส้นแล้วลงในโฟลเดอร์ uploads
         cv2.imwrite(res_filepath, cv2.cvtColor(img_visual, cv2.COLOR_RGB2BGR))
-        base_url = request.host_url.rstrip("/") + "/analysis/"
+        base_url = request.host_url.rstrip("/")
         return jsonify(
             {
                 "status": "success",
                 "ai_result": ai_res,
-                "image_path": f"{base_url}uploads/{filename}",
-                "visual_path": f"{base_url}uploads/{res_filename}",
+                "image_path": f"{base_url}/uploads/{filename}",
+                "visual_path": f"{base_url}/uploads/{res_filename}",
                 "detect_label": AI_RESULT_TH.get(ai_res, ai_res),
                 "confidence": round(avg_conf * 100, 2),
                 #"processing_time": round(time.time() - start_time, 2),
@@ -854,21 +854,3 @@ def get_assessment_result(assessment_id):
             cursor.close()
         if db is not None:
             db.close()
-# ==============================
-# 🛡️ API สำหรับขอดูรูป 
-# ==============================
-@analysis_bp.route("/uploads/<filename>", methods=["GET"])
-@jwt_required()
-def get_secure_image(filename):
-    try:
-        current_user_id = str(get_jwt_identity())
-        safe_filename = os.path.basename(filename)
-    
-        if not safe_filename.startswith(f"user_{current_user_id}_") and not safe_filename.startswith(f"res_user_{current_user_id}_"):
-            return jsonify({"status": "error", "msg": "คุณไม่มีสิทธิ์เข้าถึงรูปภาพนี้"}), 403
-
-        return send_from_directory(UPLOAD_FOLDER, safe_filename)
-        
-    except Exception as e:
-        logger.error(f"Image Access Error: {e}")
-        return jsonify({"status": "error", "msg": "ไม่พบไฟล์รูปภาพ"}), 404

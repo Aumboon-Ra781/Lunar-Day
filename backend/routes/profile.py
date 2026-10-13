@@ -57,7 +57,7 @@ def get_profile():
             return jsonify({"status": "success", "data": user}), 200
             if user.get("Profile_Image"):
                 
-                user["Profile_Image"] = f"{SERVER_URL}/static/uploads/profiles/{user['Profile_Image']}
+                user["Profile_Image"] = f"{SERVER_URL}/static/uploads/profiles/{user['Profile_Image']}"
         return jsonify({"status": "error", "error_code": "P11", "msg": "ไม่พบข้อมูลผู้ใช้"}), 404
 
     except mysql.connector.Error as err:

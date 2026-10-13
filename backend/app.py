@@ -1,5 +1,5 @@
 from datetime import timedelta
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory,request,abort
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
@@ -33,7 +33,21 @@ CORS(
     }
 )
 
+# กำหนดโฟลเดอร์สำหรับเก็บไฟล์รูปภาพ
+import os
+from flask import send_from_directory
 
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+
+
+@app.route('/uploads/<path:filename>')
+def serve_uploads(filename): 
+    referer = request.referrer
+    if not referer or not referer.startswith("http://localhost:3000"):
+        abort(403)
+    return send_from_directory(MAIN_UPLOAD_FOLDER, filename)
 
 # --- 2. ตั้งค่าระบบความปลอดภัย (JWT) ---
 app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
