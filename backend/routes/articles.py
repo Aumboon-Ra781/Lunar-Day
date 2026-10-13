@@ -108,8 +108,6 @@ def get_article_detail(article_id):
 @articles_bp.route("/articles/search", methods=["GET"])
 def search_articles():
     query = request.args.get("q", "").strip()
-    if not query:
-        return jsonify({"status":"error", "error_code":"A2", "msg": "กรุณาใส่คำค้นหา"}), 400
 
     db = get_db_connection()
     cursor = None
