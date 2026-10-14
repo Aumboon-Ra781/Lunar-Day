@@ -120,100 +120,74 @@ def register():
 # ==========================================
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    db = None    
+    db = None
     cursor = None
-    
+
     try:
         data = request.get_json(silent=True) or {}
         username = str(data.get("username", "")).strip()
         password = str(data.get("password", ""))
 
         if not username or not password:
-            return jsonify({"status":"error","error_code":"A2","msg": "กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+            return jsonify({
+                "status": "error",
+                "error_code": "A2",
+                "msg": "กรุณากรอกข้อมูลให้ครบถ้วน"
+            }), 400
 
         db = get_db_connection()
         cursor = db.cursor(dictionary=True)
-        
-        # ดึงข้อมูลผู้ใช้จากฐานข้อมูล
+
+        # ค้นหาผู้ใช้จากชื่อผู้ใช้
         sql = "SELECT * FROM User WHERE Username = %s"
         cursor.execute(sql, (username,))
         user = cursor.fetchone()
         
-        if user:
-            #  เช็คว่าบัญชีโดนระงับ
-            if user.get("LockedUntil") and user["LockedUntil"] > datetime.now():
-                # ถ้าเวลาปัจจุบันยังไม่เลยเวลาที่โดนล็อค
-                return jsonify({
-                    "status": "error",
-                    "error_code": "A3",
-                    "msg": "บัญชีของคุณถูกระงับชั่วคราวเนื่องจากเข้าสู่ระบบผิดพลาดเกิน 3 ครั้ง กรุณาลองใหม่ในอีก 30 นาที"
-                }), 403 
+        if not user or not bcrypt.check_password_hash(
+            user["Password"], password
+        ):
+            return jsonify({
+                "status": "error",
+                "error_code": "L1",
+                "msg": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+            }), 401
 
-            # ตรวจสอบรหัสผ่าน
-            if bcrypt.check_password_hash(user["Password"], password):
-                # กรณีรหัสถูกต้อง: รีเซ็ตค่าการกรอกผิดเป็น 0 และปลดล็อคบัญชี
-                reset_sql = "UPDATE User SET FailedAttempts = 0, LockedUntil = NULL WHERE UserID = %s"
-                cursor.execute(reset_sql, (user["UserID"],))
-                db.commit()
+        # เข้าสู่ระบบสำเร็จ
+        access_token = create_access_token(
+            identity=str(user["UserID"])
+        )
 
-                access_token = create_access_token(identity=str(user["UserID"]))
-                return (
-                    jsonify(
-                        {
-                            "access_token": access_token,
-                            "user": {
-                                "id": user["UserID"],
-                                "firstName": user["Name"],
-                                "lastName": user["LastName"],
-                            },
-                        }
-                    ),
-                    200,
-                )
-            else:
-                #  กรณีรหัสผิด
-                failed_count = user.get("FailedAttempts", 0) + 1
-                
-                if failed_count >= 3:
-                    # ถ้าผิดครบ 3 ครั้ง -> ล็อคบัญชี 30 นาที
-                    lockout_time = datetime.now() + timedelta(minutes=30)
-                    update_sql = "UPDATE User SET FailedAttempts = %s, LockedUntil = %s WHERE UserID = %s"
-                    cursor.execute(update_sql, (failed_count, lockout_time, user["UserID"]))
-                    db.commit()
-                    
-                    return jsonify({
-                        "status": "error",
-                        "error_code": "L3",
-                        "msg": "บัญชีของคุณถูกระงับชั่วคราวเนื่องจากเข้าสู่ระบบผิดพลาดเกิน 3 ครั้ง กรุณาลองใหม่ในอีก 30 นาที"
-                    }), 403
-                else:
-                    # ถ้ายังไม่ครบ 3 ครั้ง 
-                    update_sql = "UPDATE User SET FailedAttempts = %s WHERE UserID = %s"
-                    cursor.execute(update_sql, (failed_count, user["UserID"]))
-                    db.commit()
-                    
-                    return jsonify({
-                        "status":"error",
-                        "error_code":"L1",
-                        "msg": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"}), 401
-                    
-        else:
-            # กรณีไม่มีชื่อผู้ใช้นี้ในระบบ
-            return jsonify({"status": "error","error_code": "L2","msg": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"}), 401
-        
+        return jsonify({
+            "access_token": access_token,
+            "user": {
+                "id": user["UserID"],
+                "firstName": user["Name"],
+                "lastName": user["LastName"],
+            },
+        }), 200
+
     except mysql.connector.Error as err:
         logger.error(f"Database Error: {err}")
-        return jsonify({"status": "error","error_code": "L4","msg": "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({
+            "status": "error",
+            "error_code": "L4",
+            "msg": "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"
+        }), 500
 
     except Exception as e:
         logger.error(f"System Error: {e}")
-        return jsonify({"status": "error","error_code": "L5","msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
-        
+        return jsonify({
+            "status": "error",
+            "error_code": "L5",
+            "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"
+        }), 500
+
     finally:
         if cursor is not None:
             cursor.close()
         if db is not None:
             db.close()
+
 
 # --- Configuration (ระบบส่งเมล) ---
 GMAIL_USER1 = os.environ.get("GMAIL_USER1")
@@ -229,6 +203,7 @@ def forgot_password():
 
     generic_response = {
         "status": "success",
+        
         "msg": (
             "หากอีเมลนี้ลงทะเบียนไว้ คุณจะได้รับรหัส OTP "
             "สำหรับรีเซ็ตรหัสผ่านทางอีเมล กรุณาตรวจสอบอีเมลของคุณ"
@@ -254,7 +229,7 @@ def forgot_password():
             return jsonify({
                 "status": "error",
                 "error_code": "O11",
-                "msg": "ระบบไม่สามารถดำเนินการได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"
+                "msg": "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"
             }), 500
 
         cursor = db.cursor(dictionary=True, buffered=True)
@@ -330,7 +305,7 @@ Luna Day Team
         return jsonify({
             "status": "error",
             "error_code": "O11",
-            "msg": "ระบบไม่สามารถดำเนินการได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"
+            "msg": "ระบบแจ้งเตือน “เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง"
         }), 500
 
     except smtplib.SMTPException:
@@ -339,7 +314,7 @@ Luna Day Team
         return jsonify({
             "status": "error",
             "error_code": "O13",
-            "msg": "ไม่สามารถดำเนินการได้ในขณะนี้ กรุณาลองใหม่ภายหลัง"
+            "msg": "เกิดปัญหาในการส่งอีเมล กรุณาลองใหม่อีกครั้งภายหลัง"
         }), 500
 
     except Exception:
