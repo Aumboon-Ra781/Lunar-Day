@@ -531,7 +531,6 @@ export default function HomePage() {
                 </div>
                 <h2 className="section-title">Lunar Day ทำงานอย่างไร</h2>
               </div>
-              <p className="section-subtitle">จากภาพและอาการของคุณ สู่ผลวิเคราะห์ในไม่กี่ขั้นตอน</p>
             </div>
           </div>
           <HowItWorks />
@@ -547,7 +546,6 @@ export default function HomePage() {
                 </div>
                 <h2 className="section-title">ข่าวสารและความรู้</h2>
               </div>
-              <p className="section-subtitle">ความรู้เรื่องประจำเดือนที่ควรรู้ในรูปแบบอินโฟกราฟิก</p>
             </div>
           </div>
           <KnowledgeCarousel />
