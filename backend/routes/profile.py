@@ -9,6 +9,7 @@ import mysql.connector
 import logging
 from datetime import datetime, timedelta, date 
 from flask import send_from_directory
+from flask import request, abort, send_from_directory
 
 profile_bp = Blueprint("profile", __name__)
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 def allowed_file(filename):
+    
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ---------------------------------------------------------
