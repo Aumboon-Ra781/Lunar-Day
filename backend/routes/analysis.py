@@ -571,6 +571,7 @@ def analyze_image():
         }
         
         text_to_draw = []
+        valid_conf_list = []
         
         for cls_id, info in class_info.items():
             m = ((mask == cls_id) & (conf > CONF_THRESHOLD)).astype(np.uint8)
@@ -598,6 +599,8 @@ def analyze_image():
                         label_y = max(label_y, 10)
                         
                         text_to_draw.append((x, label_y, info["name"], info["color"]))
+                        valid_pixels_conf = conf[m_temp > 0]
+                        valid_conf_list.extend(valid_pixels_conf)
                         
         if text_to_draw:
             img_pil = Image.fromarray(img_visual)
@@ -624,6 +627,10 @@ def analyze_image():
         # เซฟภาพที่วาดเส้นแล้วลงในโฟลเดอร์ uploads
         cv2.imwrite(res_filepath, cv2.cvtColor(img_visual, cv2.COLOR_RGB2BGR))
         base_url = request.host_url.rstrip("/")
+        if len(valid_conf_list) > 0:
+            final_confidence = np.mean(valid_conf_list) # หาค่าเฉลี่ยใหม่
+        else:
+            final_confidence = 0.0
         return jsonify(
             {
                 "status": "success",
@@ -631,7 +638,7 @@ def analyze_image():
                 "image_path": f"{base_url}/uploads/{filename}",
                 "visual_path": f"{base_url}/uploads/{res_filename}",
                 "detect_label": AI_RESULT_TH.get(ai_res, ai_res),
-                "confidence": round(avg_conf * 100, 2),
+                "confidence": round(final_confidence * 100, 2),
                 #"processing_time": round(time.time() - start_time, 2),
             }
         )
