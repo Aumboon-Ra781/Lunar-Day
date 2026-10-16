@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROFILE_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads", "profiles")
 os.makedirs(PROFILE_UPLOAD_FOLDER, exist_ok=True)
+MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
@@ -225,7 +226,6 @@ def update_profile():
         if db:
             db.close()
 
-
 # ---------------------------------------------------------
 # 3. DELETE: ลบบัญชีผู้ใช้งาน
 # ---------------------------------------------------------
@@ -261,7 +261,12 @@ def delete_account():
 
         profile_img = user.get("Profile_Image")
 
-        # 2. ถ้ารหัสถูก ค่อยทำการลบข้อมูล
+        # 1.1 ดึงรายชื่อรูปภาพประวัติการวิเคราะห์ทั้งหมดของผู้ใช้คนนี้ออกมาก่อน
+        cursor.execute("SELECT Image_Path FROM Risk_Assessment WHERE UserID = %s", (user_id,))
+        assessment_records = cursor.fetchall()
+        print(f"🔍 เจอประวัติการวิเคราะห์ทั้งหมด: {len(assessment_records)} รายการ")
+
+        # 2. ถ้ารหัสถูก ค่อยทำการลบข้อมูลใน Database
         cursor.execute(
             "INSERT INTO TokenBlacklist (JTI, UserID, ExpiresAt_TK) VALUES (%s, %s, FROM_UNIXTIME(%s))",
             (jti, user_id, exp_timestamp),
@@ -273,16 +278,51 @@ def delete_account():
         
         db.commit()
 
-        # ลบรูปโปรไฟล์ทิ้งออกจากเครื่อง
-        if profile_img:
-            img_path = os.path.join(PROFILE_UPLOAD_FOLDER, profile_img)
+        # 3. จัดการลบไฟล์รูปภาพทั้งหมดทิ้งออกจากเครื่อง
+        
+        # 3.1 ลบรูปโปรไฟล์ 
+        if profile_img and "default" not in profile_img.lower():
+            clean_profile_name = os.path.basename(profile_img.replace('\\', '/'))
+            img_path = os.path.join(PROFILE_UPLOAD_FOLDER, clean_profile_name)
             if os.path.exists(img_path):
                 try:
                     os.remove(img_path)
+                    print(f"✅ ลบรูปโปรไฟล์สำเร็จ: {clean_profile_name}")
                 except Exception as e:
                     logger.warning(f"ลบรูปโปรไฟล์ไม่สำเร็จตอนลบบัญชี: {e}")
 
-        return jsonify({"status": "success", "msg": "ลบบัญชีผู้ใช้งานเรียบร้อยแล้ว"}), 200
+        # 3.2 วนลบรูปภาพประวัติการวิเคราะห์ (กวาดลบทั้งรูปต้นฉบับ และรูป res_)
+        for record in assessment_records:
+            history_img = record.get('Image_Path')
+            if history_img:
+                # แปลง \ เป็น / แล้วใช้ os.path.basename ดึงเฉพาะชื่อไฟล์เพียวๆ
+                clean_path = history_img.replace('\\', '/')
+                filename_only = os.path.basename(clean_path)
+                
+                # แยกเอาชื่อรูปต้นฉบับ และรูปผลลัพธ์ (res_)
+                if filename_only.startswith("res_"):
+                    res_filename = filename_only
+                    orig_filename = filename_only[4:]  # ตัด 'res_' ออก
+                else:
+                    orig_filename = filename_only
+                    res_filename = f"res_{filename_only}"
+
+                orig_path = os.path.join(MAIN_UPLOAD_FOLDER, orig_filename)
+                res_path = os.path.join(MAIN_UPLOAD_FOLDER, res_filename)
+
+                # สั่งลบทิ้งทั้ง 2 ไฟล์
+                for path in [orig_path, res_path]:
+                    print(f"👉 กำลังตรวจสอบพาธ: {path}")
+                    if os.path.exists(path):
+                        try:
+                            os.remove(path)
+                            print(f"✅ ลบไฟล์สำเร็จแล้ว: {os.path.basename(path)}")
+                        except Exception as e:
+                            logger.warning(f"ลบไฟล์ไม่สำเร็จ: {e}")
+                    else:
+                        print(f"❌ หาไฟล์ไม่เจอในพาธนี้: {path}")
+
+        return jsonify({"status": "success", "msg": "ลบบัญชีผู้ใช้งานและข้อมูลทั้งหมดเรียบร้อยแล้ว"}), 200
 
     except mysql.connector.Error as err:
         db.rollback()
@@ -297,7 +337,6 @@ def delete_account():
             cursor.close()
         if db:
             db.close()
-
 
 # ---------------------------------------------------------
 # 4. POST: ออกจากระบบ 

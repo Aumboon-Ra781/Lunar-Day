@@ -638,7 +638,7 @@ def analyze_image():
                 "image_path": f"{base_url}/uploads/{filename}",
                 "visual_path": f"{base_url}/uploads/{res_filename}",
                 "detect_label": AI_RESULT_TH.get(ai_res, ai_res),
-                "confidence": round(final_confidence * 100, 2),
+                "confidence": round(float(final_confidence) * 100, 2),
                 #"processing_time": round(time.time() - start_time, 2),
             }
         )
