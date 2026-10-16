@@ -1,10 +1,11 @@
+import os
 from datetime import timedelta
-from flask import Flask, send_from_directory,request,abort
+from flask import Flask, send_from_directory, request, abort, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
-import os
 from dotenv import load_dotenv
+import mysql.connector
 
 # --- นำเข้า Blueprint จากโฟลเดอร์ routes ---
 from routes.auth import auth_bp
@@ -19,7 +20,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-
 # --- 1. ตั้งค่า CORS ---
 CORS(
     app,
@@ -27,20 +27,14 @@ CORS(
         r"/*": {
             "origins": [
                 "http://localhost:3000",
-                "http://192.168.1.16:3000"
+                "http://192.168.1.25:3000"
             ]
         }
     }
 )
 
-# กำหนดโฟลเดอร์สำหรับเก็บไฟล์รูปภาพ
-import os
-from flask import send_from_directory
-
-
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-
 
 @app.route('/uploads/<path:filename>')
 def serve_uploads(filename): 
@@ -49,33 +43,55 @@ def serve_uploads(filename):
         abort(403)
     return send_from_directory(MAIN_UPLOAD_FOLDER, filename)
 
+
 # --- 2. ตั้งค่าระบบความปลอดภัย (JWT) ---
 app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
+
 @jwt.token_in_blocklist_loader
 def check_if_token_revoked(jwt_header, jwt_payload):
     jti = jwt_payload["jti"]
+    current_user_id = jwt_payload["sub"] # ดึง UserID มาจาก Token ได้เลย
 
     db = get_db_connection()
     if not db:
-        return True #
+        return True # ป้องกันกรณีฐานข้อมูลล่ม ให้ระงับสิทธิ์ไว้ก่อน
+
     cursor = db.cursor(dictionary=True)
     try:
+    
         cursor.execute("SELECT TokenID FROM TokenBlacklist WHERE JTI = %s", (jti,))
         token = cursor.fetchone()
-        return token is not None
+        if token:
+            return True # ถ้าเจอใน Blacklist ให้เตะออก
+
+        
+        cursor.execute("SELECT UserID FROM User WHERE UserID = %s", (current_user_id,))
+        user = cursor.fetchone()
+        if not user:
+            return True # ถ้าหา User ไม่เจอ ให้เตะออกเหมือนกัน
+
+        return False # รอดทุกด่าน ใช้งาน API ได้ปกติ
     finally:
         cursor.close()
         db.close()
+
+@jwt.revoked_token_loader
+def custom_revoked_token_callback(jwt_header, jwt_payload):
+    return jsonify({
+        "status": "error",
+        "msg": "บัญชีผู้ใช้นี้ถูกลบออกจากระบบแล้ว"
+    }), 401
+
 
 # --- 3. ตั้งค่า Bcrypt ---
 # ใช้สำหรับแฮชรหัสผ่านในระบบ
 bcrypt = Bcrypt(app)
 
-# --- 4. ลงทะเบียน Blueprint (Route ทั้งหมด) ---
 
+# --- 4. ลงทะเบียน Blueprint (Route ทั้งหมด) ---
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(articles_bp, url_prefix="/")
 app.register_blueprint(analysis_bp, url_prefix="/analysis")
