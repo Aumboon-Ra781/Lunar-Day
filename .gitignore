@@ -29,10 +29,11 @@ node_modules/
 
 # --- User Uploads & Static Assets ---
 backend/uploads/
-backend/static/uploads/
+backend/static/uploads/profiles
 backend/static/fonts/*.ttf
 backend/static/uploads/profiles/*
 # --- Test, Reports & Hurl ---
 backend/hurl/
 backend/report/
 backend/test/
+
