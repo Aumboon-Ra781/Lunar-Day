@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from datetime import date, datetime
-
+from config.config import SERVER_URL
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 import mysql.connector
@@ -23,7 +23,7 @@ os.makedirs(PROFILE_UPLOAD_FOLDER, exist_ok=True)
 MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png"}
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
+
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 

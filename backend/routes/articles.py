@@ -3,10 +3,9 @@ from config.database import get_db_connection
 import mysql.connector
 import os
 import logging
+from config.config import SERVER_URL
 
 articles_bp = Blueprint("articles_bp", __name__)
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
-
 # สร้างตัวแปร logger
 logger = logging.getLogger(__name__)
 

@@ -26,12 +26,12 @@ CORS(
         r"/*": {
             "origins": [
                 "http://localhost:3000",
-                "http://192.168.1.25:3000",
+                "https://luna-day-health.vercel.app",
             ]
         }
     },
 )
-
+SERVER_URL = os.getenv("SERVER_URL", "").rstrip("/")
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
