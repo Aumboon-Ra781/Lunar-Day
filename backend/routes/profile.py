@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 import mysql.connector
 from werkzeug.utils import secure_filename
+from urllib.parse import urlparse
 
 from config.database import get_db_connection
 from extensions import bcrypt
@@ -77,8 +78,8 @@ def get_profile():
                 user["Birthday"] = user["Birthday"].strftime("%Y-%m-%d")
             if user.get("Profile_Image"):
                 user["Profile_Image"] = (
-                    f"{SERVER_URL}/static/uploads/profiles/"
-                    f"{user['Profile_Image']}"
+                    f"{request.host_url.rstrip('/')}"
+                    f"/static/uploads/profiles/{user['Profile_Image']}"
                 )
             return jsonify({"status": "success", "data": user}), 200
 
