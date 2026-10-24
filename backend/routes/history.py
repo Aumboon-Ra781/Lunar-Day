@@ -15,14 +15,17 @@ SERVER_URL = os.getenv("SERVER_URL", "http://localhost:5000")
 # ---------------------------------------------------------
 # Helper: แปลงชื่อไฟล์ให้เป็น URL เต็มๆ 
 # ---------------------------------------------------------
+
 def format_history_images(record):
     if record and record.get("Image_Path"):
         image_path = record["Image_Path"]
-        filename = image_path.split("/")[-1]
-        record["Image_Path"] = f"{SERVER_URL}/uploads/{filename}"
-        record["Res_Image_Path"] = f"{SERVER_URL}/uploads/res_{filename}"
-        
+        filename = os.path.basename(image_path.replace("\\", "/"))
+        base_url = request.host_url.rstrip("/")
+        record["Image_Path"] = f"{base_url}/uploads/{filename}"
+        record["Res_Image_Path"] = f"{base_url}/uploads/res_{filename}"
+
     return record
+
 # ---------------------------------------------------------
 # 1. GET: ดึงรายการประวัติทั้งหมด 
 # ---------------------------------------------------------
