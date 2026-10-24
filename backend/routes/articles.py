@@ -4,7 +4,7 @@ import mysql.connector
 import os
 import logging
 from config.config import SERVER_URL
-
+from urllib.parse import urlparse
 articles_bp = Blueprint("articles_bp", __name__)
 # สร้างตัวแปร logger
 logger = logging.getLogger(__name__)
@@ -12,14 +12,24 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------
 # Helper: จัดการ URL รูปภาพ
 # ----------------------------------------------
+
 def format_image_url(article):
-    if (
-        article
-        and article.get("ImageURL")
-        and not article["ImageURL"].startswith("http")
-    ):
-        article["ImageURL"] = f"{SERVER_URL}{article['ImageURL']}"
+    if article and article.get("ImageURL"):
+        image_url = article["ImageURL"]
+
+        # แปลง URL เต็มให้เหลือเฉพาะ path
+        if image_url.startswith("http"):
+            image_url = urlparse(image_url).path
+
+        # ใช้ host ตามคำขอที่เข้ามา
+        base_url = request.host_url.rstrip("/")
+
+        article["ImageURL"] = (
+            f"{base_url}/{image_url.lstrip('/')}"
+        )
+
     return article
+
 
 # ----------------------------------------------
 # Helper: ปิด DB

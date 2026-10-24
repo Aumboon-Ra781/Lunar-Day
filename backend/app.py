@@ -27,11 +27,15 @@ CORS(
             "origins": [
                 "http://localhost:3000",
                 "https://luna-day-health.vercel.app",
+                "https://lunar-day-git-backend-problem-lunar-2500.vercel.app"
             ]
         }
     },
 )
-SERVER_URL = os.getenv("SERVER_URL", "").rstrip("/")
+SERVER_URL = os.getenv(
+    "SERVER_URL",
+    "http://localhost:5000"
+).rstrip("/")
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
