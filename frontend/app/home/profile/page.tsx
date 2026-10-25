@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   User, Settings, Droplets, Shield, FileText,
   LogOut, Trash2, ChevronRight, ArrowLeft,
   Camera, Eye, EyeOff, Sparkles, Activity,
-  Calendar, Edit3, X, Check, AlertTriangle
+  Calendar, Edit3, X, Check, AlertTriangle, ImageIcon
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { MIN_AGE, ageFrom, latestAllowedBirthDate, parseYmd } from '../../lib/birthDate'
@@ -48,6 +48,11 @@ type EditForm = {
 function resultImagePath(path: string) {
   return path.replace(/([^/]+)$/, 'res_$1')
 }
+
+// สิทธิ์เข้าถึงอัลบั้มภาพ (มือถือ): ถามผู้ใช้ก่อนเปิดตัวเลือกรูป แล้วจำคำตอบ "อนุญาต" ไว้
+const PHOTO_PERMISSION_KEY = 'photo_permission'
+const MSG_PHOTO_PERMISSION = 'ไม่สามารถเข้าถึงรูปภาพได้ กรุณาเปิดสิทธิ์การเข้าถึงอัลบั้มภาพในการตั้งค่าของอุปกรณ์'
+const isTouchDevice = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
 function buddhistDate(iso: string) {
   if (!iso) return '-'
@@ -377,15 +382,25 @@ function ProfileView({
 // EDIT PROFILE VIEW
 // ============================================================
 function EditProfileView({
-  avatarUrl, editForm, setEditForm, previewUrl,
-  handleAvatarChange, handleSaveProfile, onBack,
+  avatarUrl, editForm, setEditForm, previewUrl, avatarInputRef,
+  handleAvatarChange, onPickAvatar, onPickCancel, handleSaveProfile, onBack,
 }: {
   avatarUrl: string | null; editForm: EditForm
   setEditForm: React.Dispatch<React.SetStateAction<EditForm>>
   previewUrl: string | null
+  avatarInputRef: React.RefObject<HTMLInputElement | null>
   handleAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onPickAvatar: () => void; onPickCancel: () => void
   handleSaveProfile: () => void; onBack: () => void
 }) {
+  // ปิดหน้าเลือกรูปโดยไม่ได้รูป (เช่น ระบบปฏิเสธสิทธิ์อัลบั้มภาพ) → input ยิง event 'cancel'
+  useEffect(() => {
+    const input = avatarInputRef.current
+    if (!input) return
+    input.addEventListener('cancel', onPickCancel)
+    return () => input.removeEventListener('cancel', onPickCancel)
+  }, [avatarInputRef, onPickCancel])
+
   return (
     <div style={{ paddingBottom: 60 }}>
       <SubHeader title="จัดการโปรไฟล์" subtitle="แก้ไขข้อมูลส่วนตัวของคุณ" onBack={onBack} />
@@ -411,17 +426,17 @@ function EditProfileView({
                   : <User size={52} color="#c2185b" strokeWidth={1.5} />
               }
             </div>
-            <label style={{
+            <button type="button" aria-label="เปลี่ยนรูปโปรไฟล์" onClick={onPickAvatar} style={{
               position: 'absolute', bottom: 4, right: 4,
               width: 38, height: 38, borderRadius: '50%',
               background: 'linear-gradient(135deg, #f06292, #c2185b)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', boxShadow: '0 2px 8px rgba(194,24,91,0.4)',
-              border: '3px solid #fff',
+              border: '3px solid #fff', padding: 0,
             }}>
               <Camera size={15} color="#fff" />
-              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
-            </label>
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
           </div>
           <p style={{ fontSize: 13, color: '#c2185b', fontWeight: 500 }}>แตะเพื่อเปลี่ยนรูปโปรไฟล์</p>
         </div>
@@ -485,8 +500,8 @@ function HistoryThumb({ path }: { path?: string | null }) {
   )
 }
 
-function HistoryView({ history, onBack, onSelectItem, onDeleteItem }: {
-  history: HistoryItem[]; onBack: () => void; onSelectItem: (item: HistoryItem) => void; onDeleteItem: (item: HistoryItem) => void
+function HistoryView({ history, emptyMsg, onBack, onSelectItem, onDeleteItem }: {
+  history: HistoryItem[]; emptyMsg: string; onBack: () => void; onSelectItem: (item: HistoryItem) => void; onDeleteItem: (item: HistoryItem) => void
 }) {
   const [page, setPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(history.length / HISTORY_PER_PAGE))
@@ -510,7 +525,8 @@ function HistoryView({ history, onBack, onSelectItem, onDeleteItem }: {
         {history.length === 0 ? (
           <div className="pf-card" style={{ textAlign: 'center', padding: '80px 20px', color: '#9e7a8a' }}>
             <Droplets size={56} color="#f8bbd0" strokeWidth={1} style={{ marginBottom: 16 }} />
-            <p style={{ fontFamily: "'Mitr', sans-serif", fontSize: 16 }}>ยังไม่มีประวัติการวิเคราะห์</p>
+            {/* ข้อความจาก backend (GET /history/ ตอบ status 'empty') — ระหว่างรอโหลดยังไม่แสดงข้อความ */}
+            {emptyMsg && <p style={{ fontFamily: "'Mitr', sans-serif", fontSize: 16 }}>{emptyMsg}</p>}
           </div>
         ) : (
           <>
@@ -634,6 +650,7 @@ export default function ProfilePage() {
   // เริ่มจากข้อมูลที่จำไว้ (ถ้ามี) → กลับมาหน้านี้แล้วชื่อ/จำนวนประวัติไม่กะพริบ
   const [profile, setProfile] = useState<Profile | null>(getCachedProfile)
   const [history, setHistory] = useState<HistoryItem[]>(getCachedHistory)
+  const [historyEmptyMsg, setHistoryEmptyMsg] = useState('')
   const [selectedHistory, setSelectedHistory] = useState<HistoryItem | null>(null)
   const [deleteHistoryItem, setDeleteHistoryItem] = useState<HistoryItem | null>(null)
   const [deletingHistory, setDeletingHistory] = useState(false)
@@ -642,6 +659,8 @@ export default function ProfilePage() {
   const showToast = useToast()
 
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [showPhotoPermission, setShowPhotoPermission] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
@@ -716,6 +735,8 @@ export default function ProfilePage() {
       }
       const data = await res.json()
       const list = data.status === 'success' ? data.data : []
+      // ไม่มีประวัติ → backend ตอบ status 'empty' พร้อมข้อความที่ใช้แสดง
+      setHistoryEmptyMsg(data.status === 'empty' && typeof data.msg === 'string' ? data.msg : '')
       setHistory(list)
       setCachedHistory(list)
     } catch { showToast('ไม่สามารถโหลดประวัติได้', 'error') }
@@ -770,6 +791,8 @@ export default function ProfilePage() {
       setCachedHistory(next)
       setDeleteHistoryItem(null)
       showToast(msg, 'success')
+      // ลบรายการสุดท้าย → โหลดใหม่เพื่อรับข้อความ "ไม่มีประวัติ" จาก backend
+      if (next.length === 0) fetchHistory()
     } catch {
       showToast(MSG_NETWORK_ERROR, 'error')
     } finally {
@@ -846,6 +869,33 @@ export default function ProfilePage() {
     if (!file) return
     setEditForm(f => ({ ...f, avatarFile: file }))
   }
+
+  const openAvatarPicker = () => {
+    const input = avatarInputRef.current
+    if (!input) return
+    input.value = ''   // เลือกไฟล์เดิมซ้ำได้
+    input.click()
+  }
+
+  // มือถือ: ขอสิทธิ์เข้าถึงอัลบั้มภาพก่อน (ถ้ายังไม่เคยอนุญาต)
+  const handlePickAvatar = () => {
+    let granted = false
+    try { granted = localStorage.getItem(PHOTO_PERMISSION_KEY) === 'granted' } catch {}
+    if (granted || !isTouchDevice()) { openAvatarPicker(); return }
+    setShowPhotoPermission(true)
+  }
+
+  const handlePhotoPermission = (allow: boolean) => {
+    setShowPhotoPermission(false)
+    if (!allow) { showToast(MSG_PHOTO_PERMISSION, 'error'); return }
+    try { localStorage.setItem(PHOTO_PERMISSION_KEY, 'granted') } catch {}
+    openAvatarPicker()
+  }
+
+  // ปิดหน้าเลือกรูปโดยไม่ได้รูปบนมือถือ → แจ้งให้ตรวจสิทธิ์อัลบั้มภาพ
+  const handlePickCancel = useCallback(() => {
+    if (isTouchDevice()) showToast(MSG_PHOTO_PERMISSION, 'info')
+  }, [showToast])
 
   const handleGoToEditProfile = () => {
     // ถ้าข้อมูลโปรไฟล์ยังโหลดไม่เสร็จ ให้เติมฟอร์มทีหลังเมื่อ API ตอบ (fetchProfile)
@@ -963,10 +1013,12 @@ export default function ProfilePage() {
         .pf-hist-label { font-size: 11.5px; color: #9e7a8a; font-weight: 500; }
         .pf-hist-value { font-size: 13.5px; color: #1a0a14; font-weight: 500; line-height: 1.5; }
         .pf-hist-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        /* ข้อความยาว (เช่น "ไม่พบความเสี่ยงที่ชัดเจน") ขึ้นบรรทัดใหม่ในป้ายแทนการล้นออกนอกการ์ด */
         .pf-hist-badge {
-          display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px;
-          font-size: 12px; font-weight: 600; white-space: nowrap;
+          display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 12px;
+          font-size: 12px; font-weight: 600; line-height: 1.45; max-width: 100%;
         }
+        .pf-hist-badge > span:first-child { flex-shrink: 0; }
         .pf-hist-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .pf-hist-trash {
           width: 38px; height: 38px; border-radius: 12px; border: 1px solid #fde2e2; background: #fff5f5;
@@ -1074,13 +1126,14 @@ export default function ProfilePage() {
         {view === 'editProfile' && (
           <EditProfileView
             avatarUrl={avatarUrl} editForm={editForm} setEditForm={setEditForm}
-            previewUrl={previewUrl} handleAvatarChange={handleAvatarChange}
+            previewUrl={previewUrl} avatarInputRef={avatarInputRef} handleAvatarChange={handleAvatarChange}
+            onPickAvatar={handlePickAvatar} onPickCancel={handlePickCancel}
             handleSaveProfile={handleSaveProfile} onBack={() => setView('profile')}
           />
         )}
 
         {view === 'history' && (
-          <HistoryView history={history} onBack={() => setView('profile')}
+          <HistoryView history={history} emptyMsg={historyEmptyMsg} onBack={() => setView('profile')}
             onSelectItem={(item) => { setSelectedHistory(item); setView('historyDetail') }}
             onDeleteItem={(item) => setDeleteHistoryItem(item)}
           />
@@ -1127,6 +1180,30 @@ export default function ProfilePage() {
                     fontFamily: "'Mitr', sans-serif", fontSize: 14, cursor: deletingHistory ? 'wait' : 'pointer',
                     opacity: deletingHistory ? 0.7 : 1, boxShadow: '0 4px 16px rgba(239,68,68,0.35)',
                   }}>{deletingHistory ? 'กำลังลบ...' : 'ลบรายการ'}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PHOTO PERMISSION MODAL (มือถือ) */}
+        {showPhotoPermission && (
+          <div className="modal-overlay" onClick={() => handlePhotoPermission(false)}>
+            <div className="modal-sheet" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #fce4ec, #f8bbd0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ImageIcon size={26} color="#c2185b" strokeWidth={1.5} />
+                </div>
+                <h3 style={{ fontFamily: "'Mitr', sans-serif", fontSize: 18, fontWeight: 600, color: '#1a0a14', textAlign: 'center' }}>อนุญาตให้เข้าถึงรูปภาพ?</h3>
+                <p style={{ fontSize: 13, color: '#9e7a8a', textAlign: 'center', lineHeight: 1.6 }}>Lunar Day ต้องการเข้าถึงอัลบั้มภาพของคุณเพื่อเลือกรูปโปรไฟล์</p>
+                <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 8 }}>
+                  <button onClick={() => handlePhotoPermission(false)} style={{
+                    flex: 1, padding: '14px', borderRadius: 14,
+                    border: '1.5px solid rgba(194,24,91,0.2)', background: 'transparent', color: '#c2185b',
+                    fontFamily: "'Mitr', sans-serif", fontSize: 14, cursor: 'pointer',
+                  }}>ไม่อนุญาต</button>
+                  <button onClick={() => handlePhotoPermission(true)} className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>อนุญาต</button>
                 </div>
               </div>
             </div>
