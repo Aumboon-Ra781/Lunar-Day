@@ -1,4 +1,3 @@
-from email import errors
 import numpy as np
 import torch
 import cv2
@@ -11,7 +10,9 @@ import segmentation_models_pytorch as smp
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import mysql.connector
 from config.database import get_db_connection
-
+from PIL import Image, ImageDraw, ImageFont
+import uuid
+from flask import send_from_directory
 # ==============================
 # INIT
 # ==============================
@@ -82,30 +83,6 @@ ALLOWED_VALUES = {
     "q9": {"pregnant", "not_pregnant", "unsure"},
     "q10": {"small", "large"},
 }
-
-
-ALLOWED_VALUES = {
-    "q1": {"low", "normal", "high"},
-    "q2": {"short", "normal", "long"},
-    "q3": {"short", "normal", "long"},
-    "q4": {"spotting", "postcoital", "none"},
-    "q5": {"none", "mild", "severe"},
-    "q6": {"none", "mild", "severe"},
-    "q7": {
-        "palpitation",
-        "nausea",
-        "fever",
-        "breast",
-        "urine",
-        "bowel",
-        "discharge",
-    },
-    "q8": {"no_sex", "protected", "unprotected", "both", "failure"},
-    "q9": {"pregnant", "not_pregnant", "unsure"},
-    "q10": {"small", "large"},
-}
-
-
 # ==============================
 # HELPERS
 # ==============================
@@ -166,6 +143,7 @@ def run_inference(img):
             avg_conf = np.mean(conf_np[background_pixels])
         else:
             avg_conf = np.mean(conf_np)
+    
 
     return mask_np, conf_np, float(avg_conf)
 
@@ -188,9 +166,10 @@ def validate_ai_findings(mask, conf, img, std_limit):
             cv2.drawContours(m_temp, [cnt], -1, 255, -1)
             std_val = np.std(img[m_temp > 0])
            
+           
             if cls_id == 1 and std_val <= std_limit:
                     found_clot = True
-            elif cls_id == 2:
+            elif cls_id == 2 :
                     found_tissue = True
 
     if found_clot and found_tissue:
@@ -490,7 +469,6 @@ def _clean(v):
         return v.strip('"').strip("'").strip()
     return v
 
-
 @analysis_bp.route("/image", methods=["POST"])
 @jwt_required()
 def analyze_image():
@@ -501,8 +479,7 @@ def analyze_image():
         current_user_id = get_jwt_identity()
         file = request.files.get("image")
 
-
-    # =====ตรวจสอบการอัปโหลดรูปภาพ=====
+        # ===== 1. ตรวจสอบการอัปโหลดรูปภาพ =====
         if not file or file.filename == "":
             return (
                 jsonify(
@@ -514,7 +491,8 @@ def analyze_image():
                 ),
                 400,
             )
-    # =====ตรวจสอบนามสกุลไฟล์=====
+
+        # ===== 2. ตรวจสอบนามสกุลไฟล์เบื้องต้น =====
         if not allowed_file(file.filename):
             return (
                 jsonify(
@@ -527,10 +505,10 @@ def analyze_image():
                 400,
             )
 
-        # อ่านเนื้อหาไฟล์
+        # อ่านเนื้อหาไฟล์เข้า Memory (RAM)
         file_content = file.read()
 
-        # =====ตรวจสอบขนาดไฟล์=====
+        # ===== 3. ตรวจสอบขนาดไฟล์ =====
         if len(file_content) > MAX_FILE_SIZE:
             return (
                 jsonify(
@@ -542,21 +520,38 @@ def analyze_image():
                 ),
                 400,
             )
-        # ===== SAVE IMAGE =====
-        timestamp = int(time.time())
-        filename = f"user_{current_user_id}_{timestamp}.jpg"
+
+        # ===== 4. Decode รูปภาพใน Memory เพื่อดักจับไฟล์ชำรุดก่อนเซฟ =====
+        nparr = np.frombuffer(file_content, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if img is None:
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "error_code": "A4",
+                        "msg": "ไฟล์รูปภาพชำรุดหรือไม่สมบูรณ์ กรุณาตรวจสอบไฟล์แล้วอัปโหลดใหม่อีกครั้ง",
+                    }
+                ),
+                400,
+            )
+
+        # ===== 5. ดึงนามสกุลจริงและสร้างชื่อไฟล์ด้วย uuid =====
+        ext = os.path.splitext(file.filename)[1].lower()
+        unique_id = uuid.uuid4().hex  
+        filename = f"{current_user_id}_{unique_id}{ext}"
+
+        # ===== 6. เซฟไฟล์ต้นฉบับลง UPLOAD_FOLDER =====
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
+        cv2.imwrite(filepath, img)
 
-        with open(filepath, "wb") as f:
-            f.write(file_content)
-        img_bgr = cv2.imdecode(np.frombuffer(file_content, np.uint8), cv2.IMREAD_COLOR)
-        if img_bgr is None:
-            return jsonify({"status": "error", "msg": "ไม่สามารถอ่านภาพได้"}), 400
-
-        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        # ===== 7. แปลงภาพสำหรับประมวลผลต่อ =====
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img_resized = cv2.resize(img_rgb, (IMG_SIZE, IMG_SIZE))
 
-        # ===== A4: not menstrual image =====
+        # ===== 8. ตรวจสอบอัตราส่วนสีประจำเดือน (HSV Check) =====
         hsv = cv2.cvtColor(img_resized, cv2.COLOR_RGB2HSV)
 
         mask_red = cv2.inRange(
@@ -570,27 +565,28 @@ def analyze_image():
                 jsonify(
                     {
                         "status": "error",
-                        "error_code": "A5",
-                        "msg": "ไม่พบลักษณะเลือดประจำเดือนในภาพ กรุณาอัปโหลดภาพที่เกี่ยวข้องกับลักษณะเลือดประจำเดือน",
+                        "error_code": "A6",
+                        "msg": "ไม่พบลักษณะเลือดประจำเดือนในภาพ กรุณาอัปโหลดภาพที่เกี่ยวข้องลักษณะเลือดประจำเดือน",
                     }
                 ),
                 400,
             )
 
-        # ===== AI =====
+        # ===== 9. รัน AI Inference & Segmentation =====
         std_limit = calculate_dynamic_std(img_resized)
         mask, conf, avg_conf = run_inference(img_resized)
 
-        # เรียกใช้ฟังก์ชันใหม่ที่คืนค่าสถานะเป็นชื่อคลาสเลย
         ai_res = validate_ai_findings(mask, conf, img_resized, std_limit)
 
         img_visual = img_resized.copy()
 
-        # กำหนดสี (OpenCV ใช้ BGR): ลิ่มเลือด(ม่วง), เนื้อเยื่อ(แดง)
         class_info = {
-            1: {"name": "Blood Clot", "color": (128, 0, 128)},  # ม่วง
-            2: {"name": "Tissue", "color": (255, 0, 0)},
+            1: {"name": "ลิ่มเลือด", "color": (128, 0, 128)},  # ม่วง
+            2: {"name": "เนื้อเยื่อ", "color": (255, 0, 0)},    # แดง
         }
+
+        text_to_draw = []
+        valid_conf_list = []
 
         for cls_id, info in class_info.items():
             m = ((mask == cls_id) & (conf > CONF_THRESHOLD)).astype(np.uint8)
@@ -599,64 +595,80 @@ def analyze_image():
             for c in cnts:
                 area = cv2.contourArea(c)
                 if area > MIN_AREA:
-                    # 1. จำลองหน้ากากเพื่อหาค่า STD ก่อนวาด!
                     m_temp = np.zeros(img_resized.shape[:2], np.uint8)
                     cv2.drawContours(m_temp, [c], -1, 255, -1)
                     std_val = np.std(img_resized[m_temp > 0])
 
-                    # 2. สร้างเงื่อนไข "ต้องสอบผ่านด่าน STD" ถึงจะให้วาดกรอบ
                     is_valid = False
                     if cls_id == 1 and std_val <= std_limit:
                         is_valid = True
-                    elif cls_id == 2 :
+                    elif cls_id == 2:
                         is_valid = True
 
                     if is_valid:
                         cv2.drawContours(img_visual, [c], -1, info["color"], 3)
-
-                        # ใส่ชื่อคลาสกำกับ
                         x, y, w, h = cv2.boundingRect(c)
-                        label_y = (y - 10) if cls_id == 2 else (y + h + 20)
-                        label_y = max(label_y, 15)
-                        cv2.putText(
-                            img_visual,
-                            info["name"],
-                            (x, label_y),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.7,
-                            info["color"],
-                            2,
-                        )
+                        label_y = (y - 30) if cls_id == 2 else (y + h + 10)
+                        label_y = max(label_y, 10)
 
-        # ตั้งชื่อไฟล์ใหม่สำหรับภาพที่วาดผลแล้ว
+                        text_to_draw.append((x, label_y, info["name"], info["color"]))
+                        valid_pixels_conf = conf[m_temp > 0]
+                        valid_conf_list.extend(valid_pixels_conf)
+
+        # ===== 10. วาดข้อความและ Bounding Box ลงบนภาพ =====
+        if text_to_draw:
+            img_pil = Image.fromarray(img_visual)
+            draw = ImageDraw.Draw(img_pil)
+
+            try:
+                BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                font_path = os.path.join(BASE_DIR, "static", "fonts", "2.3.2 THSarabunNew.ttf")
+                font = ImageFont.truetype(font_path, 36)
+            except IOError:
+                logger.error(f"don't have {font_path} ")
+                font = ImageFont.load_default()
+
+            for (x, y, text, color) in text_to_draw:
+                draw.text((x, y), text, font=font, fill=color, stroke_width=1, stroke_fill=color)
+
+            img_visual = np.array(img_pil)
+
+        # ===== 11. บันทึกภาพผลลัพธ์ลง UPLOAD_FOLDER =====
         res_filename = f"res_{filename}"
         res_filepath = os.path.join(UPLOAD_FOLDER, res_filename)
 
-        # เซฟภาพที่วาดเส้นแล้วลงในโฟลเดอร์ uploads
         cv2.imwrite(res_filepath, cv2.cvtColor(img_visual, cv2.COLOR_RGB2BGR))
-        base_url = request.host_url
+        base_url = request.host_url.rstrip("/")
+        if len(valid_conf_list) > 0:
+            final_confidence = np.mean(valid_conf_list)
+        else:
+            final_confidence = 0.0
+
         return jsonify(
             {
                 "status": "success",
                 "ai_result": ai_res,
-                "image_path": f"{base_url}uploads/{filename}",
-                "visual_path": f"{base_url}uploads/{res_filename}",
+                "image_path": f"{base_url}/uploads/{filename}",
+                "visual_path": f"{base_url}/uploads/{res_filename}",
                 "detect_label": AI_RESULT_TH.get(ai_res, ai_res),
-                "confidence": round(avg_conf * 100, 2),
-                #"processing_time": round(time.time() - start_time, 2),
+                "confidence": round(float(final_confidence) * 100, 2),
             }
         )
 
     except Exception as e:
-        print(f"[Error] in analyze_image: {e}")
+        # ===== Cleanup ไฟล์ขยะหากเกิด System Error กลางทาง =====
         if filepath and os.path.exists(filepath):
             try:
                 os.remove(filepath)
             except:
-                pass 
+                pass
+        if res_filepath and os.path.exists(res_filepath):
+            try:
+                os.remove(res_filepath)
+            except:
+                pass
         logger.error(f"System Error: {e}")
-        return jsonify({"status": "error", "msg": "เกิดข้อผิดพลาดขณะประมวลผลรูปภาพ โปรดลองอีกครั้ง"}), 500
-
+        return jsonify({"status": "error", "error_code": "A10", "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
 
 @analysis_bp.route("/risk", methods=["POST"])
 @jwt_required()
@@ -701,7 +713,7 @@ def analyze_risk():
                     {
                         "status": "error",
                         "error_code": "A4",
-                        "msg": "กรุณากรอกข้อมูลอาการให้ครบถ้วน",
+                        "msg": "โปรดระบุข้อมูลอาการให้ครบถ้วน",
                         "errors": errors,
                     },
                 ),
@@ -712,7 +724,7 @@ def analyze_risk():
                 jsonify(
                     {
                         "status": "error",
-                        "error_code": "A6",
+                        "error_code": "A7",
                         "msg": "ความสัมพันธ์อาการไม่สอดคล้องกันของลักษณะเลือดออกและประวัติทางเพศ",
                     }
                 ),
@@ -725,17 +737,17 @@ def analyze_risk():
         results, risk_level, recommendation = screen_symptoms(ai_res, answers)
 
         if not results:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "error_code": "A7",
-                        "msg": "ไม่พบโรคที่สอดคล้องกับอาการที่ระบุ กรุณาตรวจสอบข้อมูลอาการอีกครั้ง",
-                    }
-                ),
-                400,
+            risk_level = "ไม่พบความเสี่ยงที่ชัดเจน"
+            potential_disease = "ไม่พบโรคที่สอดคล้องกับอาการ"
+            recommendation = (
+                "ระบบไม่พบภาวะหรือโรคที่สอดคล้องกับข้อมูลอาการที่ท่านระบุในฐานข้อมูลปัจจุบัน "
+                "เพื่อความถูกต้องและความปลอดภัยของท่าน แนะนำให้เข้ารับคำปรึกษาจากแพทย์ผู้เชี่ยวชาญด้านสูตินรีเวช "
+                "เพื่อรับการตรวจวินิจฉัยเพิ่มเติม"
             )
-        potential_disease = ", ".join(r["disease"] for r in results)[:255]
+            disease_scores = []
+        else:
+            potential_disease = ", ".join(r["disease"] for r in results)[:255]
+            disease_scores = results
 
         q7_joined = ",".join(answers["q7"])
         db = get_db_connection()
@@ -773,12 +785,17 @@ def analyze_risk():
         )
         db.commit()
         assessment_id = cursor.lastrowid
+
+    
+        response_error_code = "A7" if not results else None
+
         return (
             jsonify(
                 {
                     "status": "success",
+                    "error_code": response_error_code,
                     "assessment_id": assessment_id,
-                    "msg": "บันทึกข้อมูลเรียบร้อยแล้ว",
+                    "msg": "ไม่พบโรคที่สอดคล้องกับอาการที่ระบุ",
                     "data": {
                         "detect1": detect1,
                         "detect2": detect2,
@@ -786,7 +803,7 @@ def analyze_risk():
                         "potential_disease": potential_disease,
                         "risk_level": risk_level,
                         "recommendation": recommendation,
-                        "disease_scores": results,
+                        "disease_scores": disease_scores,
                     },
                 }
             ),
@@ -796,11 +813,11 @@ def analyze_risk():
         if db is not None:
             db.rollback()
         logger.error(f"Database Error: {err}")
-        return jsonify({"status": "error", "msg": "บันทึกผลวิเคราะห์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({"status": "error", "error_code": "A9", "msg": "บันทึกผลวิเคราะห์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"}), 500
         
     except Exception as e:
         logger.error(f"System Error: {e}")
-        return jsonify({"status": "error", "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({"status": "error", "error_code": "A10", "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
         
     finally:
         if cursor is not None:
@@ -809,8 +826,6 @@ def analyze_risk():
             db.close()
 
     
-
-
 @analysis_bp.route("/result/<int:assessment_id>", methods=["GET"])
 @jwt_required()
 def get_assessment_result(assessment_id):
@@ -838,7 +853,7 @@ def get_assessment_result(assessment_id):
                 jsonify(
                     {
                         "status": "error",
-                        "msg": "ไม่พบข้อมูลการประเมินนี้ หรือคุณไม่มีสิทธิ์เข้าถึง",
+                        "msg": "ไม่พบข้อมูลการประเมินนี้",
                     }
                 ),
                 404,
@@ -848,10 +863,10 @@ def get_assessment_result(assessment_id):
 
     except mysql.connector.Error as err:
         logger.error(f"Database Error: {err}")
-        return jsonify({"status": "error", "msg": "ระบบไม่สามารถดึงข้อมูลประวัติได้"}), 500
+        return jsonify({"status" : "errpr","error_code":"A11", "msg": "ไม่สามารถดูผลวิเคราะห์ กรุณาลองใหม่อีกครั้ง"}), 500
     except Exception as e:
         logger.error(f"System Error: {e}")
-        return jsonify({"status": "error", "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
+        return jsonify({"status": "error", "error_code":"A10","msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง"}), 500
     finally:
         if cursor is not None:
             cursor.close()

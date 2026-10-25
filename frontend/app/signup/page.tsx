@@ -7,8 +7,9 @@ import './signup.css'
 import Image from 'next/image'
 import { SIGNUP_SUCCESS_KEY, useToast } from '../components/Toast'
 import { postJson } from '../lib/postJson'
-import { ageFrom, parseYmd } from '../lib/birthDate'
-import { PASSWORD_MAX, PASSWORD_PLACEHOLDER, USERNAME_MAX, passwordRuleError, usernameError } from '../lib/authRules'
+import { latestAllowedBirthDate, parseYmd } from '../lib/birthDate'
+import { PASSWORD_PLACEHOLDER } from '../lib/authRules'
+import ScrollingPlaceholder from '../components/ScrollingPlaceholder'
 import { PRIVACY_TEXT, TERMS_INTRO, TERMS_TEXT } from '../lib/policyText'
 import PolicyBody from '../components/PolicyBody'
 import MiniSelect from '../components/MiniSelect'
@@ -26,8 +27,6 @@ const THAI_MONTHS = [
 ]
 const DOW = ['อา','จ','อ','พ','พฤ','ศ','ส']
 
-// รูปแบบเดียวกับที่ backend ตรวจ (routes/auth.py)
-const EMAIL_PATTERN = /^[\w.-]+@[\w.-]+\.\w+$/
 
   function ThaiDatePicker({
     value, onChange,
@@ -50,15 +49,18 @@ const EMAIL_PATTERN = /^[\w.-]+@[\w.-]+\.\w+$/
       }
     }, [open])
 
+    // เลือกได้ถึงวันเกิดที่ทำให้อายุครบ MIN_AGE ปี ณ วันนี้ (คำนวณจากวันปัจจุบัน)
+    const maxBirth = latestAllowedBirthDate()
+
     const parsed = parseYmd(value)
-    const initYear  = parsed ? parsed.getFullYear()  : today.getFullYear()
-    const initMonth = parsed ? parsed.getMonth()      : today.getMonth()
+    const initYear  = parsed ? parsed.getFullYear()  : maxBirth.getFullYear()
+    const initMonth = parsed ? parsed.getMonth()      : maxBirth.getMonth()
 
     const [viewYear,  setViewYear]  = useState(initYear)
     const [viewMonth, setViewMonth] = useState(initMonth)
 
-    const currentCE = today.getFullYear()
-    const years = Array.from({ length: 101 }, (_, i) => currentCE - 100 + i)
+    const maxYear = maxBirth.getFullYear()
+    const years = Array.from({ length: 101 }, (_, i) => maxYear - 100 + i)
 
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
     const firstDow    = new Date(viewYear, viewMonth, 1).getDay()
@@ -66,8 +68,8 @@ const EMAIL_PATTERN = /^[\w.-]+@[\w.-]+\.\w+$/
     const selectedDay = parsed && parsed.getFullYear() === viewYear && parsed.getMonth() === viewMonth
       ? parsed.getDate() : null
 
-    // วันในอนาคตเลือกไม่ได้
-    const isFuture = (d: number) => new Date(viewYear, viewMonth, d) > today
+    // วันที่ทำให้อายุยังไม่ครบ MIN_AGE ปี (รวมวันในอนาคต) เลือกไม่ได้
+    const isFuture = (d: number) => new Date(viewYear, viewMonth, d) > maxBirth
 
     const selectDay = (d: number) => {
       if (isFuture(d)) return
@@ -158,6 +160,7 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [agreed, setAgreed] = useState(false)
   const [animating, setAnimating] = useState(false)
   const [stars, setStars] = useState<Array<React.CSSProperties>>([])
@@ -196,31 +199,21 @@ export default function SignUpPage() {
     setForm(f => ({ ...f, [key]: value }))
   }
 
-  // ตรวจข้อมูลของแต่ละขั้น คืนข้อความ error หรือ null ถ้าผ่าน
-  const validateStep = (n: number): string | null => {
-    if (n === 1) {
-      if (!form.firstName.trim() || !form.lastName.trim()) return 'กรุณากรอกชื่อและนามสกุล'
-      const birth = parseYmd(form.birthDate)
-      if (!birth) return 'กรุณาเลือกวันเกิด'
-      if (birth > new Date()) return 'วันเกิดต้องไม่เป็นวันในอนาคต'
-      if (ageFrom(birth) < 13) return 'ผู้สมัครต้องมีอายุตั้งแต่ 13 ปีขึ้นไปจึงจะใช้งานได้'
-    }
-    if (n === 2) {
-      if (!form.email.trim()) return 'กรุณากรอกอีเมล'
-      if (!EMAIL_PATTERN.test(form.email.trim())) return 'รูปแบบอีเมลไม่ถูกต้อง'
-      const nameErr = usernameError(form.username)
-      if (nameErr) return nameErr
-    }
-    if (n === 3) {
-      // backend ตัดช่องว่างหัว-ท้ายรหัสผ่านก่อนตรวจ จึงตรวจแบบเดียวกัน
-      const pw = form.password.trim()
-      if (!pw) return 'กรุณากรอกรหัสผ่าน'
-      const pwErr = passwordRuleError(form.password)
-      if (pwErr) return pwErr
-      if (pw !== form.confirmPassword.trim()) return 'โปรดระบุรหัสผ่านทั้งสองช่องให้ตรงกัน'
-      if (!agreed) return 'กรุณากดยอมรับเงื่อนไขและนโยบายความเป็นส่วนตัวก่อนดำเนินการต่อ'
-    }
+  // การตรวจข้อมูลทั้งหมดทำที่ backend (/auth/register) ตามลำดับและข้อความของ backend
+  // หน้าเว็บใช้แค่หาว่าขั้นไหนยังมีช่องว่าง เพื่อพาผู้ใช้กลับไปกรอก
+  const firstEmptyStep = (): number | null => {
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate) return 1
+    if (!form.email.trim() || !form.username.trim()) return 2
+    if (!form.password.trim() || !form.confirmPassword.trim()) return 3
     return null
+  }
+
+  // ข้อความ error จาก backend → ขั้นที่มีช่องนั้น
+  const stepForError = (msg: string): number | null => {
+    if (/เงื่อนไข|รหัสผ่าน/.test(msg)) return 3
+    if (/ชื่อผู้ใช้|อีเมล/.test(msg)) return 2
+    if (/อายุ|วันที่/.test(msg)) return 1
+    return firstEmptyStep()
   }
 
   const goToStep = (target: number) => {
@@ -233,10 +226,7 @@ export default function SignUpPage() {
   }
 
   const nextStep = () => {
-    if (step >= 3) return
-    const err = validateStep(step)
-    if (err) { showToast(err, 'error'); return }
-    goToStep(step + 1)
+    if (step < 3) goToStep(step + 1)
   }
 
   const prevStep = () => {
@@ -248,12 +238,6 @@ export default function SignUpPage() {
     if (loading) return
     // กด Enter ในขั้นที่ 1-2 → ไปขั้นถัดไปแทนการส่งฟอร์ม
     if (step < 3) { nextStep(); return }
-
-    // ตรวจทุกขั้นอีกครั้ง ถ้าขั้นไหนผิดให้พากลับไปที่ขั้นนั้น
-    for (const n of [1, 2, 3]) {
-      const err = validateStep(n)
-      if (err) { showToast(err, 'error'); goToStep(n); return }
-    }
 
     setLoading(true)
     const result = await postJson('/auth/register', {
@@ -277,9 +261,11 @@ export default function SignUpPage() {
 
     const msg = result.data ? (result.data.msg ?? 'สมัครสมาชิกไม่สำเร็จ') : result.error
     showToast(msg, 'error')
-    // พากลับไปขั้นที่มีช่องผิด (ชื่อผู้ใช้/อีเมลซ้ำ → ขั้น 2, อายุ/วันที่ → ขั้น 1)
-    if (/ชื่อผู้ใช้|อีเมล/.test(msg)) goToStep(2)
-    else if (/อายุ|วันที่/.test(msg)) goToStep(1)
+    // พากลับไปขั้นที่มีช่องผิด
+    if (result.data) {
+      const target = stepForError(msg)
+      if (target) goToStep(target)
+    }
     setLoading(false)
   }
 
@@ -400,7 +386,6 @@ export default function SignUpPage() {
                   className="field-input"
                   placeholder="ชื่อผู้ใช้งาน"
                   value={form.username}
-                  maxLength={USERNAME_MAX}
                   onChange={e => handleChange('username', e.target.value)}
                 />
               </div>
@@ -423,12 +408,14 @@ export default function SignUpPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   className="field-input"
-                  placeholder={PASSWORD_PLACEHOLDER}
+                  ref={passwordRef}
+                  placeholder=""
+                  aria-label={`รหัสผ่าน (${PASSWORD_PLACEHOLDER})`}
                   value={form.password}
-                  maxLength={PASSWORD_MAX}
                   onChange={e => handleChange('password', e.target.value)}
                   style={{ paddingRight: '44px' }}
                 />
+                <ScrollingPlaceholder inputRef={passwordRef} text={PASSWORD_PLACEHOLDER} hidden={!!form.password} />
                 <button type="button" className="pw-toggle" onClick={() => setShowPassword(v => !v)} tabIndex={-1}>
                   {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
@@ -442,7 +429,6 @@ export default function SignUpPage() {
                   className="field-input"
                   placeholder="พิมพ์รหัสผ่านอีกครั้ง"
                   value={form.confirmPassword}
-                  maxLength={PASSWORD_MAX}
                   onChange={e => handleChange('confirmPassword', e.target.value)}
                   style={{ paddingRight: '44px' }}
                 />

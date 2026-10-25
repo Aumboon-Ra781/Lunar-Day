@@ -1,67 +1,101 @@
+import os
 from datetime import timedelta
-from flask import Flask, send_from_directory
+
+from dotenv import load_dotenv
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from flask_bcrypt import Bcrypt
-import os
-from dotenv import load_dotenv
 
-# --- นำเข้า Blueprint จากโฟลเดอร์ routes ---
-from routes.auth import auth_bp
-from routes.articles import articles_bp
-from routes.analysis import UPLOAD_FOLDER, analysis_bp
-from routes.profile import profile_bp
-from routes.history import history_bp
+# --- นำเข้า Blueprint และ Module ภายในโปรเจกต์ ---
 from config.database import get_db_connection
+from routes.analysis import analysis_bp
+from routes.articles import articles_bp
+from routes.auth import auth_bp
+from routes.history import history_bp
+from routes.profile import profile_bp
 
-# โหลดค่าจากไฟล์ .env
+# โหลดค่าต่าง ๆ จากไฟล์ .env
 load_dotenv()
 
 app = Flask(__name__)
 
-
-# Route สำหรับดึงรูปภาพที่อัปโหลดไว้
-@app.route("/uploads/<filename>", methods=["GET"])
-def get_uploaded_image(filename):
-    try:
-        return send_from_directory(UPLOAD_FOLDER, filename)
-    except Exception as e:
-        return {"error": "File not found"}, 404
-
-
 # --- 1. ตั้งค่า CORS ---
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "https://luna-day-health.vercel.app",
+                "https://lunar-day-git-backend-problem-lunar-2500.vercel.app"
+            ]
+        }
+    },
+)
+SERVER_URL = os.getenv(
+    "SERVER_URL",
+    "http://localhost:5000"
+).rstrip("/")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+MAIN_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+
+
+@app.route("/uploads/<path:filename>")
+def serve_uploads(filename):
+    return send_from_directory(MAIN_UPLOAD_FOLDER, filename)
+
 
 # --- 2. ตั้งค่าระบบความปลอดภัย (JWT) ---
-app.config["JWT_SECRET_KEY"] = os.environ.get(
-    "JWT_SECRET_KEY", "luna-day-default-secret-key-2026-secure"
-)
+app.config["JWT_SECRET_KEY"] = os.environ["JWT_SECRET_KEY"]
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
 
-# ดักจับ Token ที่ถูกแบน (Logout)
 @jwt.token_in_blocklist_loader
 def check_if_token_revoked(jwt_header, jwt_payload):
     jti = jwt_payload["jti"]
+    current_user_id = jwt_payload["sub"]
 
     db = get_db_connection()
+    if not db:
+        return True  # ป้องกันกรณีฐานข้อมูลล่ม ให้ระงับสิทธิ์ไว้ก่อน
+
     cursor = db.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT TokenID FROM TokenBlacklist WHERE JTI = %s", (jti,))
+        # ตรวจสอบใน TokenBlacklist
+        cursor.execute(
+            "SELECT TokenID FROM TokenBlacklist WHERE JTI = %s", (jti,)
+        )
         token = cursor.fetchone()
-        return token is not None
+        if token:
+            return True
+
+        # ตรวจสอบว่าผู้ใช้ยังมีตัวตนในระบบหรือไม่
+        cursor.execute(
+            "SELECT UserID FROM User WHERE UserID = %s",
+            (current_user_id,),
+        )
+        user = cursor.fetchone()
+        if not user:
+            return True
+
+        return False
     finally:
         cursor.close()
         db.close()
 
 
-# --- 3. ตั้งค่า Bcrypt ---
-# ใช้สำหรับแฮชรหัสผ่านในระบบ
-bcrypt = Bcrypt(app)
+@jwt.revoked_token_loader
+def custom_revoked_token_callback(jwt_header, jwt_payload):
+    return (
+        jsonify(
+            {"status": "error", "msg": "บัญชีผู้ใช้นี้ถูกลบออกจากระบบแล้ว"}
+        ),
+        401,
+    )
 
-# --- 4. ลงทะเบียน Blueprint (Route ทั้งหมด) ---
-# กำหนด Prefix ให้ชัดเจน เพื่อให้เรียกใช้ผ่าน Postman/Frontend ได้ง่าย
+
+# --- 3. ลงทะเบียน Blueprint (Route ทั้งหมด) ---
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(articles_bp, url_prefix="/")
 app.register_blueprint(analysis_bp, url_prefix="/analysis")
@@ -69,7 +103,6 @@ app.register_blueprint(profile_bp, url_prefix="/profile")
 app.register_blueprint(history_bp, url_prefix="/history")
 
 
-# หน้าแรกสำหรับเช็คว่า Server รันติดไหม
 @app.route("/")
 def index():
     return {
@@ -80,5 +113,9 @@ def index():
 
 
 if __name__ == "__main__":
-    # รันบนพอร์ต 5000 และเปิด host เป็น 0.0.0.0 เพื่อให้เพื่อนในวง LAN เดียวกันเข้าได้
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(
+        debug=False,
+        host="0.0.0.0",
+        port=5000,
+        use_reloader=False,
+    )

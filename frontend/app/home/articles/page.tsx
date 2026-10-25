@@ -178,9 +178,9 @@ export default function ArticlesPage() {
         {!loading && filtered.length > 0 && (
           <div style={GRID}>
             {filtered.map((article, i) => (
+              // ไม่ใช้ data-reveal กับการ์ดบทความ: บนมือถือการ์ดที่รอปรากฏ (opacity 0 + blur) บางใบไม่แสดงขึ้นมา
               <div
                 key={article.ArticleID}
-                data-reveal
                 onClick={() => router.push(`/home/articles/${article.ArticleID}`)}
                 style={{
                   background: '#fff',

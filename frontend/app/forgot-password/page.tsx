@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { useToast } from '../components/Toast'
 import { postJson } from '../lib/postJson'
 import { PASSWORD_HINT, PASSWORD_PLACEHOLDER, passwordRuleError } from '../lib/authRules'
+import ScrollingPlaceholder from '../components/ScrollingPlaceholder'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const OTP_LENGTH = 6
@@ -96,8 +97,8 @@ function OtpInput({
 
 // ── Timer component ───────────────────────────────────────────────────────
 function CountdownTimer({
-  seconds, onExpire,
-}: { seconds: number; onExpire: () => void }) {
+  seconds,
+}: { seconds: number }) {
   const [left, setLeft] = useState(seconds)
 
   useEffect(() => {
@@ -105,10 +106,10 @@ function CountdownTimer({
   }, [seconds])
 
   useEffect(() => {
-    if (left <= 0) { onExpire(); return }
+    if (left <= 0) return
     const id = setTimeout(() => setLeft(l => l - 1), 1000)
     return () => clearTimeout(id)
-  }, [left, onExpire])
+  }, [left])
 
   const pct  = left / OTP_EXPIRE_SECONDS
   const dash = CIRCUMFERENCE * (1 - pct)
@@ -175,7 +176,6 @@ export default function ForgotPasswordPage() {
   // Step 2
   const [otp,       setOtp]       = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [otpError,  setOtpError]  = useState(false)
-  const [expired,   setExpired]   = useState(false)
   const [timerKey,  setTimerKey]  = useState(0)
 
   // Step 3
@@ -183,6 +183,7 @@ export default function ForgotPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPw,          setShowPw]          = useState(false)
   const [showConfirm,     setShowConfirm]     = useState(false)
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [pwError,         setPwError]         = useState('')  // ใช้ทำกรอบแดง ข้อความแสดงเป็น toast
 
   // Step 4 (success)
@@ -241,11 +242,10 @@ export default function ForgotPasswordPage() {
   }
 
   const handleResend = async () => {
-    if (!expired || loading) return
+    if (loading) return
     if (!(await requestOtp())) return
     setOtp(Array(OTP_LENGTH).fill(''))
     setOtpError(false)
-    setExpired(false)
     setTimerKey(k => k + 1)
   }
 
@@ -281,7 +281,8 @@ export default function ForgotPasswordPage() {
     failPassword(result.data ? (result.data.msg ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ') : result.error)
   }
 
-  const canSubmitOtp = otp.join('').length === OTP_LENGTH && !expired
+  // ไม่ล็อกปุ่มเมื่อนับถอยหลังหมด — ให้ backend ตรวจวันหมดอายุและแจ้งข้อความ "รหัส OTP หมดอายุแล้ว" เอง
+  const canSubmitOtp = otp.join('').length === OTP_LENGTH
 
   return (
     <div className="fp-root">
@@ -397,7 +398,6 @@ export default function ForgotPasswordPage() {
               <CountdownTimer
                 key={timerKey}
                 seconds={OTP_EXPIRE_SECONDS}
-                onExpire={() => setExpired(true)}
               />
 
               <div className="btn-row" style={{ marginTop: 16 }}>
@@ -417,11 +417,11 @@ export default function ForgotPasswordPage() {
               <div className="timer-row" style={{ marginTop: 16 }}>
                 <button
                   type="button"
-                  className={`timer-resend ${expired ? 'active' : 'disabled'}`}
+                  className={`timer-resend ${loading ? 'disabled' : 'active'}`}
                   onClick={handleResend}
-                  disabled={!expired}
+                  disabled={loading}
                 >
-                  {expired ? 'ส่ง OTP อีกครั้ง' : `รหัส OTP หมดอายุแล้ว กด "ส่ง OTP อีกครั้ง"`}
+                  ส่ง OTP อีกครั้ง
                 </button>
               </div>
             </div>
@@ -437,11 +437,14 @@ export default function ForgotPasswordPage() {
                 <input
                   type={showPw ? 'text' : 'password'}
                   className={`field-input${pwError ? ' error' : ''}`}
-                  placeholder={PASSWORD_PLACEHOLDER}
+                  ref={passwordRef}
+                  placeholder=""
+                  aria-label={`รหัสผ่านใหม่ (${PASSWORD_PLACEHOLDER})`}
                   value={password}
                   onChange={e => { setPassword(e.target.value); setPwError('') }}
                   style={{ paddingRight: 44 }}
                 />
+                <ScrollingPlaceholder inputRef={passwordRef} text={PASSWORD_PLACEHOLDER} hidden={!!password} />
                 <button type="button" className="pw-toggle" onClick={() => setShowPw(v => !v)} tabIndex={-1}>
                   {showPw ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
@@ -491,4 +494,4 @@ export default function ForgotPasswordPage() {
       </div>
     </div>
   )
-}
+}
