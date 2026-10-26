@@ -10,7 +10,7 @@ import {
 import Navbar from '../../components/Navbar'
 import { useToast } from '../../../components/Toast'
 import RiskLegend from '../../../components/RiskLegend'
-import { NO_CLEAR_RISK, getRiskLevel } from '../../../lib/riskLevels'
+import { getRiskLevel } from '../../../lib/riskLevels'
 import { apiBase, backendUrl } from '../../../lib/apiBase'
 import { visuallyHidden } from '../../../lib/a11y'
 
@@ -125,22 +125,10 @@ function resetPregnancyIfHidden(f: SymptomForm): SymptomForm {
   return needsPregnancyQuestion(f) ? f : { ...f, is_pregnant: '' }
 }
 
-// backend ตอบ A7 เมื่อกรอกครบแต่ไม่ตรงกับโรคใดในฐานข้อมูล → แสดงเป็นผลลัพธ์แทน error
-const NO_MATCH_LEVEL = NO_CLEAR_RISK
-const NO_MATCH_DISEASE = 'ไม่พบโรคที่สอดคล้องกับอาการของท่านในฐานข้อมูลปัจจุบัน'
-const NO_MATCH_RECOMMENDATION =
-  'ระบบไม่พบภาวะหรือโรคที่สอดคล้องกับข้อมูลอาการที่ท่านระบุในฐานข้อมูลปัจจุบัน ' +
-  'เพื่อความถูกต้องและความปลอดภัยของท่าน แนะนำให้เข้ารับคำปรึกษาจากแพทย์ผู้เชี่ยวชาญด้านสูตินรีเวช ' +
-  'เพื่อรับการตรวจวินิจฉัยเพิ่มเติม'
-const CLOT_SIZE_TH: Record<string, string> = { small: 'ขนาดเล็ก', large: 'ขนาดใหญ่' }
 
-// กรณีไม่พบลิ่มเลือด/เนื้อเยื่อ ค่าที่ backend ส่งมาคือความมั่นใจว่าเป็น "พื้นหลัง" ซึ่งสูงเสมอ
-// และไม่ได้สื่อถึงผลที่บอกผู้ใช้ จึงไม่แสดง %
-function hasConfidence(r: { ai_result: string }) {
-  return r.ai_result !== 'negative space'
-}
-function confidenceText(r: { ai_result: string; confidence: number }) {
-  return hasConfidence(r) ? `${r.confidence.toFixed(1)}%` : '–'
+// แสดงค่าความมั่นใจที่ backend ส่งมาทุกกรณี (รวมถึงกรณีไม่พบลิ่มเลือด/เนื้อเยื่อ)
+function confidenceText(r: { confidence: number | null | undefined }) {
+  return typeof r.confidence === 'number' ? `${r.confidence.toFixed(1)}%` : '–'
 }
 
 // แยกคำแนะนำเป็นข้อ ๆ แล้วตัดข้อที่ซ้ำกันออก (เทียบหลังตัดช่องว่างเกิน) เหลือข้อละครั้ง
@@ -331,7 +319,7 @@ export default function AnalyzePage() {
   useEffect(() => { setMounted(true) }, [])
 
   const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) return
+    // ไม่กรองชนิดไฟล์ที่ฝั่งหน้าเว็บ — ส่งให้ backend ตรวจนามสกุลและแจ้งข้อความเอง (A2)
     setImageValidated(false)
     setImageResult(null)
     setAiImage(null)
@@ -340,7 +328,8 @@ export default function AnalyzePage() {
     reader.onload = e => {
       if (uploadSeq.current === seq) setImage(e.target?.result as string)
     }
-    reader.readAsDataURL(file)
+    // แสดงตัวอย่างเฉพาะไฟล์รูปภาพ (ไฟล์อื่นรอผลตรวจจาก backend)
+    if (file.type.startsWith('image/')) reader.readAsDataURL(file)
 
     const token = localStorage.getItem('access_token')
     if (!token) { showToast('กรุณาเข้าสู่ระบบก่อนใช้งานฟีเจอร์นี้', 'info'); return }
@@ -359,12 +348,9 @@ export default function AnalyzePage() {
       }
       const data: ImageResult = await res.json()
       if (data.status !== 'success') {
-        // A5 = backend ตรวจแล้วไม่ใช่ภาพที่เกี่ยวกับเลือด/ลิ่มเลือด
-        const err = data as unknown as { error_code?: string; msg?: string }
+        const err = data as unknown as { msg?: string }
         // ใช้ข้อความจาก backend ก่อน ถ้าไม่มีจึงใช้ข้อความสำรอง
-        flashError(err.msg || (err.error_code === 'A5'
-          ? 'กรุณาแนบรูปภาพที่เกี่ยวกับลิ่มเลือด'
-          : 'รูปภาพไม่ถูกต้อง กรุณาอัปโหลดรูปใหม่'))
+        flashError(err.msg || 'รูปภาพไม่ถูกต้อง กรุณาอัปโหลดรูปใหม่')
         // เอารูปเดิมออก และล้าง input เพื่อให้เลือกรูปใหม่ (หรือไฟล์เดิม) ได้ทันที
         reader.abort()
         if (fileRef.current) fileRef.current.value = ''
@@ -440,23 +426,7 @@ export default function AnalyzePage() {
         return
       }
       const data = await res.json()
-      if (data.error_code === 'A7') {
-        const detect1 = imageResult?.detect_label ?? ''
-        const detect2 = imageResult?.ai_result === 'clot'
-          ? `${detect1}${CLOT_SIZE_TH[form.size] ?? ''}`
-          : detect1
-        setRiskResult({
-          status:            'no_match',
-          Detect1:           detect1,
-          Detect2:           detect2,
-          Risk_Level:        NO_MATCH_LEVEL,
-          Potential_Disease: typeof data.msg === 'string' && data.msg ? data.msg : NO_MATCH_DISEASE,
-          Recommendation:    NO_MATCH_RECOMMENDATION,
-          saved:             false,
-        })
-        setStep('result')
-        return
-      }
+      // กรณีไม่พบโรคที่สอดคล้อง backend ตอบ success พร้อมระดับ "ไม่พบความเสี่ยงที่ชัดเจน" และคำแนะนำมาเอง
       if (data.status !== 'success') {
         flashError(data.msg ?? 'ประเมินความเสี่ยงไม่สำเร็จ'); setStep('symptoms')
       } else {
@@ -544,7 +514,8 @@ export default function AnalyzePage() {
           50%       { box-shadow: 0 4px 24px rgba(194,24,91,0.7); }
         }
         .step-label { font-family: 'Mitr', sans-serif; font-size: 12px; min-width: 0; }
-        .step-label-main { color: #1a0a14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* แสดงชื่อขั้นตอนเต็ม ไม่ตัดเป็น "..." */
+        .step-label-main { color: #1a0a14; white-space: nowrap; }
         .step-label-sub  { font-size: 10.5px; color: #9e7a8a; font-family: 'Sarabun', sans-serif; white-space: nowrap; }
         .step-connector { width: 32px; height: 2px; border-radius: 1px; background: #f5e6ec; flex-shrink: 0; margin: 0 8px; transition: background 0.3s ease; }
         .step-connector.done { background: linear-gradient(90deg, #f06292, #c2185b); }
@@ -680,11 +651,13 @@ export default function AnalyzePage() {
           .ah-sub { font-size: 12.5px; }
 
           .step-bar { padding: 0 12px; }
-          .step-track { padding: 12px 10px; gap: 0; }
+          /* จอเล็ก: วางชื่อขั้นตอนไว้ใต้วงกลม เพื่อให้มีที่แสดงชื่อเต็ม */
+          .step-track { padding: 12px 10px; gap: 0; align-items: flex-start; }
+          .step-node { flex: 0 0 auto; flex-direction: column; gap: 6px; text-align: center; }
           .step-label-sub { display: none; }
-          .step-connector { width: 12px; margin: 0 2px; }
+          .step-connector { flex: 1 1 8px; width: auto; min-width: 8px; margin: 12px 2px 0; }
           .step-circle { width: 26px; height: 26px; font-size: 11px; }
-          .step-label-main { font-size: 10px; }
+          .step-label-main { font-size: 11px; }
 
           .analyze-main { padding: 0 12px; margin: 20px auto 36px; }
           .main-card { border-radius: 16px; }
@@ -716,6 +689,9 @@ export default function AnalyzePage() {
         @media (min-width: 481px) and (max-width: 768px) {
           .analyze-header { padding: 32px 24px 56px; }
           .step-bar { padding: 0 16px; }
+          .step-track { align-items: flex-start; }
+          .step-node { flex: 0 0 auto; flex-direction: column; gap: 6px; text-align: center; }
+          .step-connector { flex: 1 1 8px; width: auto; min-width: 8px; margin: 15px 4px 0; }
           .analyze-main { padding: 0 16px; }
           .trust-strip { grid-template-columns: 1fr 1fr; padding: 0 16px; }
           .step-label-sub { display: none; }
@@ -782,7 +758,7 @@ export default function AnalyzePage() {
                   <div className="cst-icon"><ImageIcon size={18} color="#c2185b" /></div>
                   <div>
                     <div className="cst-text">อัปโหลดภาพประจำเดือน</div>
-                    <div className="cst-sub">รองรับ JPG, PNG, JPEG ขนาดไม่เกิน 10MB</div>
+                    <div className="cst-sub">รองรับ JPG, JPEG, PNG ขนาดไม่เกิน 10MB</div>
                   </div>
                 </div>
 
@@ -867,7 +843,7 @@ export default function AnalyzePage() {
                   <div className="ai-result-badge">
                     <CheckCircle2 size={13} />
                     ผลภาพ: <strong>{imageResult.detect_label}</strong>
-                    {hasConfidence(imageResult) && <>&nbsp;(ความมั่นใจ AI {confidenceText(imageResult)})</>}
+                    &nbsp;(ความมั่นใจ AI {confidenceText(imageResult)})
                   </div>
                 )}
 

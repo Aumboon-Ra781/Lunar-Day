@@ -79,10 +79,7 @@ export default function LoginPage() {
     e.preventDefault()
     if (loading) return
     const name = username.trim()
-    if (!name || !password.trim()) {
-      showToast('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน', 'error')
-      return
-    }
+    // ช่องว่าง → ส่งให้ backend ตอบข้อความ "กรอกข้อมูลไม่ครบ" เอง
     if (/\s/.test(name)) {
       showToast('ชื่อผู้ใช้ห้ามมีช่องว่าง', 'error')
       return
