@@ -120,8 +120,13 @@ def calculate_dynamic_std(img_rgb):
 
 def run_inference(img):
     model_inst = get_model()
+
     input_tensor = (
-        torch.from_numpy(img).permute(2, 0, 1).float().unsqueeze(0).to(DEVICE) / 255
+        torch.from_numpy(img)
+        .permute(2, 0, 1)
+        .float()
+        .unsqueeze(0)
+        .to(DEVICE) / 255.0
     )
 
     with torch.no_grad():
@@ -130,20 +135,15 @@ def run_inference(img):
         conf, mask = torch.max(prob, dim=1)
 
     mask_np = mask[0].cpu().numpy()
-
     conf_np = conf[0].cpu().numpy()
-    
-    detected = (mask_np > 0) & (conf_np > CONF_THRESHOLD)
-    
+    prob_np = prob[0].cpu().numpy()
+
+    detected = ((mask_np > 0)& (conf_np > CONF_THRESHOLD))
+
     if np.any(detected):
         avg_conf = np.mean(conf_np[detected])
     else:
-        background_pixels = mask_np == 0
-        if np.any(background_pixels):
-            avg_conf = np.mean(conf_np[background_pixels])
-        else:
-            avg_conf = np.mean(conf_np)
-    
+        avg_conf = np.mean(prob_np[0])
 
     return mask_np, conf_np, float(avg_conf)
 
@@ -640,10 +640,10 @@ def analyze_image():
         cv2.imwrite(res_filepath, cv2.cvtColor(img_visual, cv2.COLOR_RGB2BGR))
         base_url = request.host_url.rstrip("/")
         if len(valid_conf_list) > 0:
-            final_confidence = np.mean(valid_conf_list)
+             final_confidence = float(np.mean(valid_conf_list))
         else:
-            final_confidence = 0.0
-
+            final_confidence = float(avg_conf)
+       
         return jsonify(
             {
                 "status": "success",
