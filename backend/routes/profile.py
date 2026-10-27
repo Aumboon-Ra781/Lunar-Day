@@ -54,7 +54,7 @@ def get_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P9",
+                    "error_code": "P8",
                     "msg": "เกิดข้อผิดพลาดในการบันทึกข้อมูล "
                     "กรุณาลองใหม่อีกครั้ง",
                 }
@@ -87,7 +87,7 @@ def get_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P11",
+                    "error_code": "P10",
                     "msg": "ไม่พบข้อมูลผู้ใช้",
                 }
             ),
@@ -100,7 +100,7 @@ def get_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P9",
+                    "error_code": "P8",
                     "msg": "เกิดข้อผิดพลาดในการดึงข้อมูลจากฐานข้อมูล "
                     "กรุณาลองใหม่อีกครั้ง",
                 }
@@ -114,7 +114,7 @@ def get_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P10",
+                    "error_code": "P9",
                     "msg": "เกิดข้อผิดพลาดของระบบ กรุณาลองใหม่อีกครั้ง",
                 }
             ),
@@ -143,7 +143,7 @@ def update_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P9",
+                    "error_code": "P8",
                     "msg": "เกิดข้อผิดพลาดในการบันทึกข้อมูล "
                     "กรุณาลองใหม่อีกครั้ง",
                 }
@@ -163,7 +163,7 @@ def update_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P5",
+                    "error_code": "P4",
                     "msg": "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วนก่อนทำการบันทึก",
                 }
             ),
@@ -194,7 +194,7 @@ def update_profile():
                 jsonify(
                     {
                         "status": "error",
-                        "error_code": "P7",
+                        "error_code": "P6",
                         "msg": "ชื่อผู้ใช้งานต้องมีความยาวไม่เกิน 32 ตัวอักษร",
                     }
                 ),
@@ -206,7 +206,7 @@ def update_profile():
                 jsonify(
                     {
                         "status": "error",
-                        "error_code": "P6",
+                        "error_code": "P5",
                         "msg": "ห้ามมีช่องว่างระหว่างชื่อผู้ใช้งาน",
                     }
                 ),
@@ -235,7 +235,7 @@ def update_profile():
                     jsonify(
                         {
                             "status": "error",
-                            "error_code": "P8",
+                            "error_code": "P7",
                             "msg": "ผู้ใช้งานต้องมีอายุตั้งแต่ 13 ปีขึ้นไป",
                         }
                     ),
@@ -271,7 +271,7 @@ def update_profile():
                     jsonify(
                         {
                             "status": "error",
-                            "error_code": "P4",
+                            "error_code": "P3",
                             "msg": "ขนาดไฟล์เกินขีดจำกัด "
                             "กรุณาอัปโหลดไฟล์ขนาดไม่เกิน 10 MB",
                         }
@@ -355,7 +355,7 @@ def update_profile():
             jsonify(
                 {
                     "status": "error",
-                    "error_code": "P9",
+                    "error_code": "P8",
                     "msg": "เกิดข้อผิดพลาดในการบันทึกข้อมูล "
                     "กรุณาลองใหม่อีกครั้ง",
                 }
