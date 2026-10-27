@@ -459,9 +459,6 @@ def delete_account():
             (user_id,),
         )
         assessment_records = cursor.fetchall()
-        logger.info(
-            f"เจอประวัติการวิเคราะห์ทั้งหมด: {len(assessment_records)} รายการ"
-        )
 
         # 2. ถ้ารหัสถูก ค่อยทำการลบข้อมูลใน Database
         cursor.execute(
@@ -531,7 +528,7 @@ def delete_account():
             jsonify(
                 {
                     "status": "success",
-                    "msg": "ลบบัญชีผู้ใช้งานและข้อมูลทั้งหมดเรียบร้อยแล้ว",
+                    "msg": "ลบบัญชีผู้ใช้งานเรียบร้อยแล้ว",
                 }
             ),
             200,
