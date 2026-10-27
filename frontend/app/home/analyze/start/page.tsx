@@ -37,6 +37,16 @@ const EMPTY_FORM: SymptomForm = {
   pelvic_pain: '', symptoms: [], sex_history: '', is_pregnant: '', size: '',
 }
 
+const PHOTO_ACCESS_NOTICE_KEY = 'analysis_photo_access_notice_seen'
+
+function photoAccessNoticeKey() {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null') as { id?: string | number } | null
+    if (user?.id !== undefined && user.id !== null) return `${PHOTO_ACCESS_NOTICE_KEY}:${user.id}`
+  } catch {}
+  return `${PHOTO_ACCESS_NOTICE_KEY}:anonymous`
+}
+
 interface ImageResult {
   status: string
   ai_result: string
@@ -303,7 +313,9 @@ export default function AnalyzePage() {
   const [image,      setImage]     = useState<string | null>(null)   // ภาพจากเครื่อง (แสดงในหน้าอัปโหลด)
   const [aiImage,    setAiImage]   = useState<string | null>(null)   // ภาพที่ AI วาดกรอบ (แสดงในหน้าระบุอาการ)
   const [dragOver,   setDragOver]  = useState(false)
+  const [showPhotoAccessNotice, setShowPhotoAccessNotice] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const seenPhotoAccessNoticeKeys = useRef(new Set<string>())
   const uploadSeq = useRef(0)  // นับรอบการเลือกรูป กันผลของรูปเก่ามาทับรูปใหม่
   const [imageValidated,    setImageValidated]    = useState(false)
   // ข้อความจาก backend ทั้งหมดแสดงผ่าน toast กลาง (components/Toast)
@@ -317,6 +329,29 @@ export default function AnalyzePage() {
   const [imageLoading, setImageLoading] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
+
+  const openImagePicker = () => {
+    const input = fileRef.current
+    if (!input) return
+    input.value = ''
+    input.click()
+  }
+
+  const handleChooseImage = () => {
+    const noticeKey = photoAccessNoticeKey()
+    let hasSeenNotice = seenPhotoAccessNoticeKeys.current.has(noticeKey)
+    if (!hasSeenNotice) {
+      try { hasSeenNotice = localStorage.getItem(noticeKey) === 'seen' } catch {}
+    }
+    if (hasSeenNotice) {
+      openImagePicker()
+      return
+    }
+
+    seenPhotoAccessNoticeKeys.current.add(noticeKey)
+    try { localStorage.setItem(noticeKey, 'seen') } catch {}
+    setShowPhotoAccessNotice(true)
+  }
 
   const handleFile = useCallback(async (file: File) => {
     // ไม่กรองชนิดไฟล์ที่ฝั่งหน้าเว็บ — ส่งให้ backend ตรวจนามสกุลและแจ้งข้อความเอง (A2)
@@ -546,6 +581,15 @@ export default function AnalyzePage() {
         .upload-zone-sub { font-size: 12.5px; color: #9e7a8a; text-align: center; line-height: 1.5; }
         .upload-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 999px; background: linear-gradient(135deg, #f06292, #c2185b); color: #fff; font-family: 'Mitr', sans-serif; font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(194,24,91,0.35); }
 
+        .photo-access-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(26,10,20,0.55); backdrop-filter: blur(4px); }
+        .photo-access-dialog { width: min(100%, 420px); padding: 28px; border-radius: 22px; background: #fff; box-shadow: 0 20px 60px rgba(26,10,20,0.25); display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+        .photo-access-icon { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #fce4ec, #f8bbd0); display: flex; align-items: center; justify-content: center; }
+        .photo-access-title { font-family: 'Mitr', sans-serif; font-size: 18px; font-weight: 600; color: #1a0a14; }
+        .photo-access-message { font-size: 13px; color: #7a5a6a; line-height: 1.7; }
+        .photo-access-actions { display: flex; gap: 12px; width: 100%; margin-top: 6px; }
+        .photo-access-actions button { flex: 1; justify-content: center; }
+        .photo-access-cancel { padding: 13px 16px; border: 1.5px solid rgba(194,24,91,0.2); border-radius: 14px; background: transparent; color: #c2185b; font-family: 'Mitr', sans-serif; font-size: 14px; cursor: pointer; }
+
         /* Image preview */
         .img-preview { margin: 20px 32px; border-radius: 18px; overflow: hidden; position: relative; border: 2px solid #f5e6ec; }
         .img-preview img { width: 100%; max-height: 320px; object-fit: cover; display: block; }
@@ -765,7 +809,7 @@ export default function AnalyzePage() {
                 {!image ? (
                   <div
                     className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
-                    onClick={() => fileRef.current?.click()}
+                    onClick={handleChooseImage}
                     onDrop={handleDrop}
                     onDragOver={e => { e.preventDefault(); setDragOver(true) }}
                     onDragLeave={() => setDragOver(false)}
@@ -775,6 +819,7 @@ export default function AnalyzePage() {
                     <div className="upload-zone-sub">รูปที่แสดงถึงเกี่ยวข้องประจำเดือน</div>
                     <div className="upload-chip"><ImageIcon size={13} /> เลือกภาพ</div>
                     <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                      onClick={e => e.stopPropagation()}
                       onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
                   </div>
                 ) : (
@@ -1016,6 +1061,33 @@ export default function AnalyzePage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {showPhotoAccessNotice && (
+          <div className="photo-access-overlay" onClick={() => setShowPhotoAccessNotice(false)}>
+            <div
+              className="photo-access-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="photo-access-title"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="photo-access-icon"><ImageIcon size={26} color="#c2185b" strokeWidth={1.5} /></div>
+              <h2 id="photo-access-title" className="photo-access-title">ตรวจสอบสิทธิ์การเข้าถึงรูปภาพ</h2>
+              <p className="photo-access-message">
+                หากอุปกรณ์หรือเบราว์เซอร์แจ้งขอสิทธิ์เข้าถึงรูปภาพ โปรดเลือกอนุญาต หากเลือกภาพไม่ได้ ให้ตรวจสอบสิทธิ์การเข้าถึงอัลบั้มภาพในการตั้งค่าอุปกรณ์หรือเบราว์เซอร์
+              </p>
+              <div className="photo-access-actions">
+                <button className="photo-access-cancel" onClick={() => setShowPhotoAccessNotice(false)}>ภายหลัง</button>
+                <button
+                  className="btn-primary"
+                  onClick={() => { setShowPhotoAccessNotice(false); openImagePicker() }}
+                >
+                  เข้าใจแล้ว เลือกภาพ
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
