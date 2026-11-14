@@ -94,7 +94,7 @@ def register():
         consent_value = 1 if consent else 0
 
             # บันทึกข้อมูล
-        sql = "INSERT INTO User (Username, Password, Name, LastName, Birthday, Email, Is_Consent) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        sql = "INSERT INTO user (Username, Password, Name, LastName, Birthday, Email, Is_Consent) VALUES (%s, %s, %s, %s, %s, %s, %s)"
         values = (username, hashed_pw, name, lastname, birthday_obj, email, consent_value)
 
         cursor.execute(sql, values)
@@ -251,7 +251,7 @@ def forgot_password():
         # บันทึก OTP และเวลาหมดอายุ
         cursor.execute(
             """
-            UPDATE User
+            UPDATE user
             SET ResetOTP = %s, OTPExpireTime = %s
             WHERE UserID = %s
             """,
@@ -444,7 +444,7 @@ def reset_password():
         #  อัปเดตรหัสผ่าน และเคลียร์ค่า OTP ทิ้ง
         cursor.execute(
             """
-            UPDATE User 
+            UPDATE user 
             SET Password = %s, ResetOTP = NULL, OTPExpireTime = NULL
             WHERE Email = %s
             """,
