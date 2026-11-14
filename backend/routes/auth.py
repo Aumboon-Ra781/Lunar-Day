@@ -80,13 +80,13 @@ def register():
         cursor = db.cursor(dictionary=True)
 
         # ตรวจสอบ Username ซ้ำ
-        check_sql = "SELECT Username FROM User WHERE Username = %s"
+        check_sql = "SELECT Username FROM user WHERE Username = %s"
         cursor.execute(check_sql, (username,))
         if cursor.fetchone():
             return jsonify({"status":"error","error_code":"R1","msg": "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว"}), 400
 
         # ตรวจสอบ email ซ้ำ
-        check_sql = "SELECT Email FROM User WHERE Email = %s"
+        check_sql = "SELECT Email FROM user WHERE Email = %s"
         cursor.execute(check_sql, (email,))
         if cursor.fetchone():
             return jsonify({"status":"error","error_code":"R7","msg": "อีเมลนี้ถูกใช้แล้ว กรุณาระบุอีเมลใหม่"}), 400
@@ -139,7 +139,7 @@ def login():
         cursor = db.cursor(dictionary=True)
 
         # ค้นหาผู้ใช้จากชื่อผู้ใช้
-        sql = "SELECT * FROM User WHERE Username = %s"
+        sql = "SELECT * FROM user WHERE Username = %s"
         cursor.execute(sql, (username,))
         user = cursor.fetchone()
         
@@ -236,7 +236,7 @@ def forgot_password():
 
         # ค้นหาอีเมลในระบบ
         cursor.execute(
-            "SELECT UserID FROM User WHERE Email = %s",
+            "SELECT UserID FROM user WHERE Email = %s",
             (email,)
         )
         user = cursor.fetchone()
@@ -355,7 +355,7 @@ def verify_otp():
         cursor.execute(
             """
             SELECT UserID, OTPExpireTime 
-            FROM User 
+            FROM user 
             WHERE Email = %s AND ResetOTP = %s
             """,
             (email, otp),
@@ -424,7 +424,7 @@ def reset_password():
         cursor.execute(
             """
             SELECT UserID, OTPExpireTime 
-            FROM User 
+            FROM user 
             WHERE Email = %s AND ResetOTP = %s
             """,
             (email, otp),
