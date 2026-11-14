@@ -841,7 +841,7 @@ def get_assessment_result(assessment_id):
             """
             SELECT AssessmentID, Detect1, Detect2, Confidence, 
                    Potential_Disease, Risk_Level, Recommendation, Image_Path
-            FROM Risk_Assessment
+            FROM risk_assessment
             WHERE AssessmentID = %s AND UserID = %s
             """,
             (assessment_id, current_user_id),
