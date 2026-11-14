@@ -67,7 +67,7 @@ def get_profile():
 
         sql = """
             SELECT Username, Name, LastName, Birthday, Email, Profile_Image
-            FROM User
+            FROM user
             WHERE UserID = %s
         """
         cursor.execute(sql, (user_id,))
@@ -174,7 +174,7 @@ def update_profile():
         cursor = db.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT UserID FROM User WHERE Username = %s AND UserID != %s",
+            "SELECT UserID FROM user WHERE Username = %s AND UserID != %s",
             (username, user_id),
         )
         if cursor.fetchone():
@@ -299,7 +299,7 @@ def update_profile():
         old_profile_image = None
         if profile_img_name:
             cursor.execute(
-                "SELECT Profile_Image FROM User WHERE UserID = %s",
+                "SELECT Profile_Image FROM user WHERE UserID = %s",
                 (user_id,),
             )
             user_record = cursor.fetchone()
@@ -432,7 +432,7 @@ def delete_account():
 
         # 1. เช็ครหัสผ่านก่อนว่าตรงกับในฐานข้อมูลไหม
         cursor.execute(
-            "SELECT Password, Profile_Image FROM User WHERE UserID = %s",
+            "SELECT Password, Profile_Image FROM user WHERE UserID = %s",
             (user_id,),
         )
         user = cursor.fetchone()
@@ -455,7 +455,7 @@ def delete_account():
 
         # 1.1 ดึงรายชื่อรูปภาพประวัติการวิเคราะห์ทั้งหมดของผู้ใช้คนนี้ออกมา
         cursor.execute(
-            "SELECT Image_Path FROM Risk_Assessment WHERE UserID = %s",
+            "SELECT Image_Path FROM risk_assessment WHERE UserID = %s",
             (user_id,),
         )
         assessment_records = cursor.fetchall()
