@@ -326,7 +326,7 @@ def update_profile():
             params.append(profile_img_name)
 
         params.append(user_id)
-        sql = f"UPDATE User SET {', '.join(updates)} WHERE UserID=%s"
+        sql = f"UPDATE user SET {', '.join(updates)} WHERE UserID=%s"
         cursor.execute(sql, params)
         db.commit()
 
@@ -462,19 +462,19 @@ def delete_account():
 
         # 2. ถ้ารหัสถูก ค่อยทำการลบข้อมูลใน Database
         cursor.execute(
-            "INSERT INTO TokenBlacklist (JTI, UserID, ExpiresAt_TK) "
+            "INSERT INTO tokenblacklist (JTI, UserID, ExpiresAt_TK) "
             "VALUES (%s, %s, FROM_UNIXTIME(%s))",
             (jti, user_id, exp_timestamp),
         )
 
         cursor.execute(
-            "DELETE FROM Risk_Assessment WHERE UserID = %s", (user_id,)
+            "DELETE FROM risk_assessment WHERE UserID = %s", (user_id,)
         )
         cursor.execute(
-            "DELETE FROM User WHERE UserID = %s", (user_id,)
+            "DELETE FROM user WHERE UserID = %s", (user_id,)
         )
         cursor.execute(
-            "DELETE FROM TokenBlacklist WHERE ExpiresAt_TK < NOW()"
+            "DELETE FROM tokenblacklist WHERE ExpiresAt_TK < NOW()"
         )
 
         db.commit()
@@ -598,13 +598,13 @@ def logout():
         cursor = db.cursor()
 
         cursor.execute(
-            "INSERT INTO TokenBlacklist (JTI, UserID, ExpiresAt_TK) "
+            "INSERT INTO tokenblacklist (JTI, UserID, ExpiresAt_TK) "
             "VALUES (%s, %s, FROM_UNIXTIME(%s))",
             (jti, user_id, exp_timestamp),
         )
 
         cursor.execute(
-            "DELETE FROM TokenBlacklist WHERE ExpiresAt_TK < NOW()"
+            "DELETE FROM tokenblacklist WHERE ExpiresAt_TK < NOW()"
         )
         db.commit()
         return (
