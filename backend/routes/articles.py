@@ -55,7 +55,7 @@ def get_articles():
     try:
         cursor = db.cursor(dictionary=True)
 
-        sql = "SELECT ArticleID, Title, ImageURL FROM Article"
+        sql = "SELECT ArticleID, Title, ImageURL FROM article"
         cursor.execute(sql)
         articles = cursor.fetchall()
 
@@ -90,7 +90,7 @@ def get_article_detail(article_id):
     try:
         cursor = db.cursor(dictionary=True)
 
-        sql = "SELECT * FROM Article WHERE ArticleID = %s"
+        sql = "SELECT * FROM article WHERE ArticleID = %s"
         cursor.execute(sql, (article_id,))
         article = cursor.fetchone()
 
@@ -130,7 +130,7 @@ def search_articles():
 
         sql = """
             SELECT ArticleID, Title, ImageURL 
-            FROM Article 
+            FROM article 
             WHERE Title LIKE %s OR Content LIKE %s
         """
         cursor.execute(sql, (f"%{query}%", f"%{query}%"))
