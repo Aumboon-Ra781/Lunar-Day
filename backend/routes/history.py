@@ -45,7 +45,7 @@ def get_history_list():
         query = """
             SELECT AssessmentID, Detect2, Risk_Level, Potential_Disease, 
                    Image_Path, Create_At 
-            FROM Risk_Assessment 
+            FROM risk_assessment 
             WHERE UserID = %s 
             ORDER BY Create_At DESC
         """
@@ -88,7 +88,7 @@ def get_history_detail(assessment_id):
 
     try:
         cursor = db.cursor(dictionary=True)
-        query = "SELECT * FROM Risk_Assessment WHERE AssessmentID = %s AND UserID = %s"
+        query = "SELECT * FROM risk_assessment WHERE AssessmentID = %s AND UserID = %s"
         cursor.execute(query, (assessment_id, current_user_id))
         detail = cursor.fetchone()
 
@@ -130,7 +130,7 @@ def delete_history(assessment_id):
     try:
         cursor = db.cursor(dictionary=True) 
         
-        find_query = "SELECT Image_Path FROM Risk_Assessment WHERE AssessmentID = %s AND UserID = %s"
+        find_query = "SELECT Image_Path FROM risk_assessment WHERE AssessmentID = %s AND UserID = %s"
         cursor.execute(find_query, (assessment_id, current_user_id))
         record = cursor.fetchone()
 
@@ -138,7 +138,7 @@ def delete_history(assessment_id):
             return jsonify({"status": "error", "error_code": "H1", "msg": "ไม่พบข้อมูลประวัติการใช้งาน"}), 404
 
         # 2. ลบข้อมูลจากฐานข้อมูล
-        delete_query = "DELETE FROM Risk_Assessment WHERE AssessmentID = %s AND UserID = %s"
+        delete_query = "DELETE FROM risk_assessment WHERE AssessmentID = %s AND UserID = %s"
         cursor.execute(delete_query, (assessment_id, current_user_id))
         db.commit()
 
