@@ -754,7 +754,7 @@ def analyze_risk():
         cursor = db.cursor()
         cursor.execute(
             """
-            INSERT INTO Risk_Assessment
+            INSERT INTO risk_assessment
                 (UserID, Detect1, Detect2, Confidence,
                  Q1_Flow_Volume, Q2_Duration, Q3_Cycle_Frequency,
                  Q4_Bleeding_Characteristics, Q5_Menstrual_Pain, Q6_Pelvic_Pain,
