@@ -21,8 +21,8 @@
 - [เกี่ยวกับโปรเจกต์](#เกี่ยวกับโปรเจกต์)
 - [เทคโนโลยีและเครื่องมือที่ใช้](#เทคโนโลยีและเครื่องมือที่ใช้)
 - [โครงสร้างโปรเจกต์](#โครงสร้างโปรเจกต์)
-- [การติดตั้งแบบ Localhost](#การติดตั้งแบบ-localhost)
-- [การใช้งานผ่าน Vercel และ Cloudflare](#การใช้งานผ่าน-vercel-และ-cloudflare)
+- [ข้อกำหนดเบื้องต้น](#ข้อกำหนดเบื้องต้น)
+- [การติดตั้งและใช้งานด้วย Docker](#การติดตั้งและใช้งานด้วย-docker)
 - [การทดสอบระบบ](#การทดสอบระบบ)
 - [ฟังก์ชันการใช้งาน](#ฟังก์ชันการใช้งาน)
 - [Backend API](#backend-api)
@@ -73,421 +73,283 @@
 
 [กลับไปสารบัญ](#สารบัญ)
 
-
 ## เทคโนโลยีและเครื่องมือที่ใช้
+| ส่วนประกอบ | เทคโนโลยี |
+|---|---|
+| Frontend | Next.js, React, TypeScript, Tailwind CSS |
+| Backend | Python, Flask |
+| AI / Deep Learning | PyTorch, segmentation-models-pytorch, OpenCV |
+| Database | MySQL 8.4 |
+| Containerization | Docker, Docker Compose |
+| Image Annotation | Roboflow |
+| Version Control | Git |
 
-| ส่วนประกอบ | เทคโนโลยี / เครื่องมือ | เวอร์ชัน | ดาวน์โหลด |
-| :--- | :--- | :--- | :--- |
-| Frontend | Next.js | 16.2.0 | [เว็บไซต์](https://nextjs.org/) |
-| | React | 19.2.4 | [เว็บไซต์](https://react.dev/) |
-| | TypeScript | 5.9.3 | [ดาวน์โหลด](https://www.typescriptlang.org/download/) |
-| | Tailwind CSS | 4.2.2 | [เว็บไซต์](https://tailwindcss.com/) |
-| Runtime | Node.js | 24.19.0 | [ดาวน์โหลด](https://nodejs.org/en/download) |
-| | npm | 11.17.0 | ติดตั้งพร้อม Node.js |
-| Backend | Python | 3.13.11 | [ดาวน์โหลด](https://www.python.org/downloads/) |
-| | Flask | 3.1.3 | [เว็บไซต์](https://flask.palletsprojects.com/) |
-| AI / Deep Learning | PyTorch | 2.13.0 | [เว็บไซต์](https://pytorch.org/get-started/locally/) |
-| | segmentation-models-pytorch | 0.5.0 | [GitHub](https://github.com/qubvel-org/segmentation_models.pytorch) |
-| | OpenCV | 5.0.0.93 | [เว็บไซต์](https://opencv.org/get-started/) |
-| Image Annotation | Roboflow | - | [เว็บไซต์](https://roboflow.com/) |
-| Database | MySQL Community Server - GPL | 26.7 | [ดาวน์โหลด](https://dev.mysql.com/downloads/mysql/) |
-| Database Management Tool | MySQL Workbench | 8.0.47 | [ดาวน์โหลด](https://dev.mysql.com/downloads/workbench/) |
-| Version Control | Git | 2.55.0.windows.4 | [ดาวน์โหลด](https://git-scm.com/downloads) |
-| Code Editor | Visual Studio Code | - | [ดาวน์โหลด](https://code.visualstudio.com/Download) |
-| Frontend Hosting | Vercel | - | [เว็บไซต์](https://vercel.com/) |
-| Backend Tunnel | Cloudflare Quick Tunnel (cloudflared) | 2026.10.3 | [ดาวน์โหลด](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/) |
+### ไฟล์สำคัญสำหรับการติดตั้ง
 
-หมายเหตุ:
-- npm ติดตั้งมาพร้อมกับ Node.js
-- Flask, PyTorch, segmentation-models-pytorch และ OpenCV ติดตั้งผ่าน pip
-- Next.js, React, TypeScript และ Tailwind CSS ติดตั้งผ่าน npm
-- Cloudflared จำเป็นเฉพาะกรณีใช้งาน Cloudflare Quick Tunnel
-- เวอร์ชันที่ระบุเป็นเวอร์ชันจากสภาพแวดล้อมที่ใช้พัฒนาโปรเจกต์
+| ไฟล์ | รายละเอียด |
+|---|---|
+| `docker-compose.yml` | กำหนดบริการ Frontend, Backend และ MySQL |
+| `frontend/Dockerfile` | กำหนดขั้นตอน Build และเริ่ม Frontend |
+| `backend/Dockerfile` | กำหนดสภาพแวดล้อมและ Dependencies ของ Backend |
+| `.env.docker.example` | ตัวอย่างตัวแปรสภาพแวดล้อมสำหรับ Docker |
+| `database/Dump_Lunar_Docker.sql` | SQL Dump สำหรับเริ่มต้นฐานข้อมูล |
+| `backend/InceptionResnet-V2-LR-0.00001.pth` | ไฟล์โมเดล AI ที่ผ่านการฝึกสอนแล้ว |
 
+---
 
 
 ### ไฟล์โมเดลและไฟล์ฐานข้อมูล
 
 | ไฟล์ | รายละเอียด |
 | :--- | :--- |
-| `Dump_Lunar_0.1.sql` | ไฟล์ SQL Dump สำหรับนำเข้าโครงสร้างและข้อมูลของฐานข้อมูล MySQL |
-| `incep_exp12.pth` | ไฟล์โมเดล AI ที่ผ่านการฝึกสอนแล้ว ให้วางไว้ในโฟลเดอร์ `backend/` |
+| `InceptionResnet-V2-LR-0.00001.pth` | ไฟล์โมเดล AI ที่ผ่านการฝึกสอนแล้ว ให้วางไว้ในโฟลเดอร์ `backend/` |
 
 **ลิงก์ดาวน์โหลดไฟล์**
-
-- ดาวน์โหลดไฟล์ฐานข้อมูล: [Dump_Lunar_0.1.sql](https://drive.google.com/file/d/10cjGha7Z7lvXuD48L3SGK4VAGqQcYY_5/view?usp=drive_link)
-- ดาวน์โหลดไฟล์ AI Model: [incep_exp12.pth](https://drive.google.com/file/d/1aZNYYyzp_yvnleVKbwixL3YVA3ZXlUKB/view?usp=sharing)
+- ดาวน์โหลดไฟล์ AI Model: [InceptionResnet-V2-LR-0.00001.pth](https://drive.google.com/file/d/1aZNYYyzp_yvnleVKbwixL3YVA3ZXlUKB/view?usp=sharing)
 
 [กลับไปสารบัญ](#สารบัญ)
 
 ## โครงสร้างโปรเจกต์
 
+โครงสร้างสำคัญของโปรเจกต์สำหรับการติดตั้งด้วย Docker ควรมีลักษณะดังนี้
+
 ```text
 Lunar-Day/
 │
 ├── backend/
+│   ├── Dockerfile
 │   ├── app.py
-│   ├── extensions.py
 │   ├── requirements.txt
-│   ├── .env.example
 │   ├── incep_exp12.pth
 │   ├── config/
 │   ├── routes/
 │   ├── static/
-│   │   └── uploads/
 │   └── uploads/
 │
 ├── frontend/
+│   ├── Dockerfile
 │   ├── package.json
 │   ├── package-lock.json
 │   ├── next.config.ts
-│   ├── .env.local.example
 │   ├── public/
 │   └── app/
-│       ├── layout.tsx
-│       ├── page.tsx
-│       ├── login/
-│       ├── signup/
-│       ├── forgot-password/
-│       ├── components/
-│       ├── lib/
-│       └── home/
-│           ├── analyze/
-│           ├── articles/
-│           ├── profile/
-│           └── contact/
 │
-├── Dump_Lunar_0.1.sql
-├── .gitignore
-└── README.md     └── contact/
+├── database/
+│   └── Dump_Lunar_Docker.sql
+│
+├── .env.docker.example
+├── docker-compose.yml
+└── README.md
 ```
 
 [กลับไปสารบัญ](#สารบัญ)
 
-# การติดตั้งและใช้งานระบบแบบ Localhost
+## ข้อกำหนดเบื้องต้น
 
-## 1. ดาวน์โหลดโปรเจกต์
+เครื่องคอมพิวเตอร์ที่ใช้ติดตั้งต้องมี
 
-ก่อนเริ่มติดตั้ง ตรวจสอบว่ามีโปรแกรมที่จำเป็น ได้แก่
+1. **Docker Desktop** สำหรับ Windows หรือ Docker Engine และ Docker Compose สำหรับระบบปฏิบัติการที่รองรับ
+2. การเชื่อมต่ออินเทอร์เน็ตในขั้นตอนดาวน์โหลด Image และ Build ครั้งแรก
+3. RAM และพื้นที่จัดเก็บข้อมูลเพียงพอสำหรับ Docker Images, Dependencies และไฟล์ AI Model
 
-- Git
-- Python
-- Node.js และ npm
-- MySQL Server
-- MySQL Workbench (สำหรับจัดการฐานข้อมูล)
+ไม่จำเป็นต้องติดตั้ง Python, Node.js หรือ MySQL Server แยกบนเครื่อง เนื่องจากบริการเหล่านี้ทำงานภายใน Docker Containers
 
-เปิด Command Prompt (CMD) แล้วใช้คำสั่ง
+### ดาวน์โหลดและติดตั้ง Docker Desktop
 
-```bat
+1. เข้าเว็บไซต์ [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+2. ดาวน์โหลดเวอร์ชันที่ตรงกับระบบปฏิบัติการ
+3. ติดตั้ง Docker Desktop ตามขั้นตอนของโปรแกรม
+4. หากใช้ Windows ให้ทำตามคำแนะนำเกี่ยวกับ WSL 2 ที่ตัวติดตั้งแสดง
+5. เปิด Docker Desktop และรอจนกว่า Docker Engine จะพร้อมใช้งาน
+
+เปิด PowerShell แล้วตรวจสอบการติดตั้งด้วยคำสั่ง
+
+```powershell
+docker --version
+docker compose version
+```
+
+หากแสดงหมายเลขเวอร์ชัน แสดงว่าสามารถเรียกใช้ Docker และ Docker Compose จาก PowerShell ได้
+
+---
+
+## การติดตั้งและใช้งานด้วย Docker
+
+### 1. ดาวน์โหลดโปรเจกต์
+
+เปิด PowerShell แล้วใช้คำสั่ง
+
+```powershell
 git clone https://github.com/yourmenis/Lunar-Day.git
 cd Lunar-Day
 ```
 
-> หมายเหตุ: เปลี่ยน URL ตัวอย่างด้านบนเป็น GitHub Repository จริงของโปรเจกต์ก่อนใช้งาน
 
-## 2. สร้างฐานข้อมูล MySQL
+### 2. เตรียมไฟล์ที่จำเป็น
 
-ดาวน์โหลดไฟล์ `Dump_Lunar_0.1.sql` จากลิงก์ดาวน์โหลดที่กำหนดไว้ในส่วนไฟล์โมเดลและไฟล์ฐานข้อมูล
+ตรวจสอบว่ามีไฟล์ต่อไปนี้ครบถ้วน
 
-เปิด MySQL Workbench และเชื่อมต่อ MySQL Server จากนั้นเลือกเมนู **Server → Data Import**
+- `database/Dump_Lunar_Docker.sql`
+- `backend/incep_exp12.pth`
+- `docker-compose.yml`
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
 
-1. เลือก **Import from Self-Contained File**
-2. เลือกไฟล์ `Dump_Lunar_0.1.sql`
-3. ตรวจสอบว่าไม่ได้เลือกฐานข้อมูลปลายทางอื่นที่ขัดกับฐานข้อมูลในไฟล์ SQL Dump
-4. กด **Start Import** เพื่อเริ่มนำเข้าฐานข้อมูล
+หากไฟล์ SQL Dump หรือไฟล์ AI Model ไม่ได้อยู่ใน Repository ให้ดาวน์โหลดจากแหล่งที่ผู้พัฒนาเตรียมไว้ และวางในตำแหน่งตามโครงสร้างโปรเจกต์
 
-ไฟล์ SQL Dump มีคำสั่งสร้างฐานข้อมูล `userdb` และเลือกใช้งานฐานข้อมูลดังกล่าวอยู่แล้ว จึงไม่จำเป็นต้องสร้างฐานข้อมูลด้วยตนเองก่อน Import
+### 3. ตั้งค่า Environment Variables
 
-เมื่อนำเข้าสำเร็จ จะได้ฐานข้อมูลชื่อ `userdb` พร้อมตารางและข้อมูลที่จำเป็นสำหรับระบบ Lunar Day
+คัดลอกไฟล์ตัวอย่างเพื่อสร้างไฟล์ `.env.docker`
 
-**กรณีใช้ Command Prompt (CMD)** สามารถนำเข้าฐานข้อมูลด้วยคำสั่งต่อไปนี้ โดยเปลี่ยนตำแหน่งไฟล์ให้ตรงกับเครื่องที่ใช้งาน
-
-```bat
-mysql -u root -p < "C:\path\to\Dump_Lunar_0.1.sql"
+```powershell
+Copy-Item .env.docker.example .env.docker
 ```
 
-จากนั้นกรอกรหัสผ่าน MySQL เมื่อระบบร้องขอ
-
-> หมายเหตุ: คำสั่งนี้ใช้ผ่าน CMD ที่สามารถเรียกใช้คำสั่ง `mysql` ได้ หากไม่พบคำสั่ง ให้ตรวจสอบการติดตั้ง MySQL และ PATH หรือใช้เมนู Data Import ใน MySQL Workbench
-
-ตารางหลักของระบบ ได้แก่
-
-- `User` — ข้อมูลบัญชีผู้ใช้
-- `Risk_Assessment` — ผลการประเมินความเสี่ยง
-- `Article` — บทความสุขภาพ
-- `TokenBlacklist` — Token ที่ถูกยกเลิก
-
-## 3. ติดตั้ง Backend
-
-เปิด CMD และตรวจสอบว่าอยู่ในโฟลเดอร์หลัก `Lunar-Day` จากนั้นใช้คำสั่ง
-
-```bat
-cd backend
-python -m venv venv
-venv\Scripts\activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-คำสั่งข้างต้นจะสร้าง Virtual Environment และติดตั้งไลบรารีที่จำเป็นสำหรับ Backend ตามรายการในไฟล์ `requirements.txt`
-
-เมื่อติดตั้งสำเร็จ จะสามารถใช้งาน Python Environment สำหรับโปรเจกต์นี้ได้
-
-หากติดตั้ง PyTorch ไม่สำเร็จ ให้ตรวจสอบคำสั่งติดตั้งที่ [เว็บไซต์ PyTorch](https://pytorch.org/get-started/locally/)
-
-## 4. วางไฟล์ AI Model
-
-ดาวน์โหลดไฟล์ `incep_exp12.pth` แล้ววางไว้ในโฟลเดอร์ `backend/` ระดับเดียวกับไฟล์ `app.py`
-
-ตัวอย่างโครงสร้างไฟล์
-
-```text
-Lunar-Day/
-└── backend/
-    ├── app.py
-    ├── incep_exp12.pth
-    ├── requirements.txt
-    ├── config/
-    └── ...
-```
-
-## 5. ตั้งค่าไฟล์ .env
-
-สร้างไฟล์ `.env` ภายในโฟลเดอร์ `backend/` แล้วกำหนดค่าตามตัวอย่าง
+เปิดไฟล์ `.env.docker` แล้วกำหนดค่าตามตัวอย่างต่อไปนี้
 
 ```env
-JWT_SECRET_KEY=ข้อความลับที่คาดเดายาก
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=รหัสผ่าน MySQL
-DB_NAME=userdb
+MYSQL_ROOT_PASSWORD=กำหนดรหัสผ่านสำหรับ MySQL root
+DB_PASSWORD=กำหนดรหัสผ่านสำหรับ lunar_user
+JWT_SECRET_KEY=กำหนดค่า Secret Key ที่คาดเดายาก
 GMAIL_USER1=อีเมล Gmail สำหรับส่ง OTP
-GMAIL_APP_PASSWORD=App Password ของ Gmail
-SERVER_URL=http://localhost:5000
+GMAIL_APP_PASSWORD=Gmail App Password
 ```
 
-**รายละเอียดการตั้งค่า**
+รายละเอียดตัวแปร
 
 | ตัวแปร | รายละเอียด |
 |---|---|
+| `MYSQL_ROOT_PASSWORD` | รหัสผ่านผู้ดูแลระบบ MySQL |
+| `DB_PASSWORD` | รหัสผ่านของผู้ใช้ฐานข้อมูล `lunar_user` |
 | `JWT_SECRET_KEY` | Secret Key สำหรับสร้างและตรวจสอบ JWT Token |
-| `DB_HOST` | ที่อยู่ของ MySQL Server |
-| `DB_USER` | ชื่อผู้ใช้งาน MySQL |
-| `DB_PASSWORD` | รหัสผ่าน MySQL |
-| `DB_NAME` | ชื่อฐานข้อมูล กำหนดเป็น `userdb` |
-| `GMAIL_USER1` | บัญชี Gmail สำหรับส่ง OTP |
+| `GMAIL_USER1` | บัญชี Gmail ที่ใช้ส่ง OTP |
 | `GMAIL_APP_PASSWORD` | App Password สำหรับเชื่อมต่อ Gmail |
-| `SERVER_URL` | URL ของ Backend Server |
 
-**หมายเหตุเกี่ยวกับ SERVER_URL**
+**ข้อควรทราบ**
 
-ในไฟล์ `app.py` มีการกำหนดค่าเริ่มต้นไว้แล้ว ดังนี้
+- กำหนดรหัสผ่านและ Secret Key ของเครื่องที่ติดตั้งเอง ไม่ใช้ค่าตัวอย่างตามตัวอักษร
+- หากต้องการทดสอบการส่ง OTP ต้องกำหนด Gmail และ App Password ที่ใช้งานได้ โดยผู้ติดตั้งควรใช้บัญชีของตนเอง
+- ห้ามเผยแพร่ไฟล์ `.env.docker` หรือ Commit ไฟล์นี้ขึ้น GitHub
+- ไม่ต้องส่งรหัสผ่าน Gmail หรือ Secret Key ของผู้พัฒนาให้อาจารย์
 
-```python
-SERVER_URL = os.getenv(
-    "SERVER_URL",
-    "http://localhost:5000"
-).rstrip("/")
+### 4. Build และเริ่มระบบ
+
+เปิด PowerShell ในโฟลเดอร์หลัก `Lunar-Day` แล้วรันคำสั่ง
+
+```powershell
+docker compose --env-file .env.docker up -d --build
 ```
 
-ดังนั้น หากไม่ได้กำหนด `SERVER_URL` ในไฟล์ `.env` ระบบจะใช้ `http://localhost:5000` โดยอัตโนมัติ
+Docker Compose จะดำเนินการดังนี้
 
-สำหรับการติดตั้งแบบ Localhost สามารถกำหนดเป็น `http://localhost:5000` ตามตัวอย่างได้
+1. Build Frontend Image
+2. Build Backend Image และติดตั้ง Dependencies ที่กำหนดไว้
+3. สร้างและเริ่ม MySQL Container
+4. เริ่ม Backend Container หลังจาก MySQL ผ่าน Health Check
+5. เริ่ม Frontend Container
 
-**การสร้าง Gmail App Password**
+การ Build ครั้งแรกอาจใช้เวลานาน ขึ้นอยู่กับความเร็วอินเทอร์เน็ตและประสิทธิภาพของเครื่อง เนื่องจากต้องดาวน์โหลด Base Images และติดตั้ง Dependencies
 
-1. เปิดใช้งาน 2-Step Verification ในบัญชี Google
-2. เข้า [Google App Passwords](https://myaccount.google.com/apppasswords)
-3. สร้าง App Password แล้วนำมาใส่ใน `GMAIL_APP_PASSWORD`
+### 5. ตรวจสอบสถานะ Containers
 
-> หมายเหตุ: ห้ามเผยแพร่ไฟล์ `.env` หรือข้อมูลรหัสผ่านลงใน GitHub
-
-## 6. ติดตั้ง Frontend
-
-เปิด CMD อีกหน้าต่าง โดยเริ่มจากโฟลเดอร์หลัก `Lunar-Day` แล้วใช้คำสั่ง
-
-```bat
-cd frontend
-npm ci
+```powershell
+docker compose --env-file .env.docker ps
 ```
 
-คำสั่ง `npm ci` จะติดตั้งแพ็กเกจตามรายการและเวอร์ชันที่กำหนดไว้ในไฟล์ `package-lock.json`
+ควรตรวจสอบให้บริการทั้ง 3 ส่วน ได้แก่ `mysql`, `backend` และ `frontend` อยู่ในสถานะทำงาน
 
-เมื่อติดตั้งสำเร็จ ให้สร้างไฟล์ `.env.local` ภายในโฟลเดอร์ `frontend/` และกำหนดค่า Backend API URL ดังนี้
+หากต้องการดู Log ของทุกบริการ
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000
+```powershell
+docker compose --env-file .env.docker logs --tail=100
 ```
 
-> หมายเหตุ: Frontend ใช้ตัวแปร `NEXT_PUBLIC_API_URL` สำหรับกำหนด URL ของ Backend API หากมีการเปลี่ยนแปลงค่า Environment Variable ให้หยุดและเริ่ม Frontend ใหม่อีกครั้ง
+หากต้องการดู Log เฉพาะบริการ
 
-## 7. เปิดใช้งานระบบ
-
-การเปิดใช้งานระบบต้องเปิด Command Prompt แยกเป็น 2 หน้าต่าง โดยให้ Backend และ Frontend ทำงานพร้อมกัน
-
-### หน้าต่าง CMD ที่ 1 — Backend
-
-เปิด CMD โดยเริ่มจากโฟลเดอร์หลัก `Lunar-Day` แล้วใช้คำสั่ง
-
-```bat
-cd backend
-venv\Scripts\activate
-python app.py
+```powershell
+docker compose --env-file .env.docker logs backend
+docker compose --env-file .env.docker logs frontend
+docker compose --env-file .env.docker logs mysql
 ```
 
-เมื่อ Backend เริ่มทำงานแล้ว สามารถเข้าถึง Backend ได้ที่
+### 6. เข้าใช้งานระบบ
 
-`http://localhost:5000`
+เมื่อ Containers เริ่มทำงานแล้ว เปิดเว็บเบราว์เซอร์และเข้าใช้งานตาม URL ต่อไปนี้
 
-### หน้าต่าง CMD ที่ 2 — Frontend
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:5000/ |
 
-เปิด CMD อีกหน้าต่าง โดยเริ่มจากโฟลเดอร์หลัก `Lunar-Day` แล้วใช้คำสั่ง
+เมื่อเปิด `http://localhost:5000/` ควรได้รับข้อความแจ้งว่า API ทำงานอยู่
 
-```bat
-cd frontend
-npm run dev
+```json
+{
+  "message": "Luna Day API is running!",
+  "version": "1.0.0",
+  "status": "success"
+}
 ```
-
-เมื่อ Frontend เริ่มทำงานแล้ว เปิดเว็บไซต์ผ่าน Browser ที่
-
-`http://localhost:3000`
-
-หากพอร์ต 3000 ถูกใช้งาน ให้ใช้คำสั่ง
-
-```bat
-npm run dev -- -p 3001
-```
-
-จากนั้นเปิดเว็บไซต์ที่
-
-`http://localhost:3001`
 
 ---
 
-## 8. ตรวจสอบการทำงานของระบบ
+## การตรวจสอบระบบ
 
-หลังจากเปิดใช้งาน Backend และ Frontend เรียบร้อยแล้ว ให้ตรวจสอบรายการต่อไปนี้
+หลังเริ่มระบบแล้ว ให้ตรวจสอบการทำงานของฟังก์ชันหลัก
 
-- [ ] Backend สามารถเริ่มทำงานได้โดยไม่มี Error
-- [ ] Frontend สามารถเริ่มทำงานได้โดยไม่มี Error
-- [ ] สามารถเปิดเว็บไซต์ผ่าน Browser ได้
-- [ ] ระบบสามารถเชื่อมต่อฐานข้อมูล `userdb` ได้
-- [ ] สามารถสมัครสมาชิกหรือเข้าสู่ระบบได้
-- [ ] ระบบสามารถส่ง OTP ผ่าน Gmail ได้
-- [ ] สามารถใช้งานฟังก์ชันประเมินความเสี่ยงได้
-- [ ] ระบบสามารถเรียกใช้งาน AI Model ได้
-- [ ] สามารถแสดงผลลัพธ์และข้อมูลบนหน้าเว็บไซต์ได้
-
-หากทุกขั้นตอนทำงานได้ตามปกติ แสดงว่าสามารถติดตั้งและเปิดใช้งานระบบ Lunar Day แบบ Localhost ได้
-
-[กลับไปสารบัญ](#สารบัญ)
-
-[กลับไปสารบัญ](#สารบัญ)
-
-## การใช้งานผ่าน Vercel และ Cloudflare
-
-รูปแบบนี้ใช้ Vercel สำหรับ Frontend และใช้เครื่อง Windows ของผู้พัฒนาเป็นเครื่องรัน Backend, AI Model และ MySQL โดยเชื่อมต่อผ่าน **Cloudflare Quick Tunnel (ฟรี)**
-
-### 1. Deploy Frontend บน Vercel
-
-1. Push Source Code ขึ้น GitHub โดยไม่รวมไฟล์ `.env`
-2. เข้า [Vercel](https://vercel.com/) และเลือก Add New Project
-3. เชื่อมต่อ GitHub Repository
-4. กำหนด Root Directory เป็น `frontend`
-5. ตรวจสอบการตั้งค่า Build แล้วกด Deploy
-
-เมื่อ Deploy สำเร็จ จะได้รับ URL เว็บไซต์ เช่น
-
-```text
-https://luna-day-health.vercel.app
-```
-
-ให้ใช้ Production Domain จริงจากหน้า Vercel ของโปรเจกต์
-
-### 2. เปิด Backend และ Cloudflare Quick Tunnel
-
-1. เปิด MySQL Server
-2. เปิด Backend ตามขั้นตอน Localhost
-3. ดาวน์โหลด Cloudflare Tunnel สำหรับ Windows จาก [Cloudflare Tunnel Downloads](https://developers.cloudflare.com/tunnel/downloads/)
-4. เปิด CMD หรือ PowerShell ในโฟลเดอร์ที่มี `cloudflared.exe`
-5. รันคำสั่ง
-
-```bat
-"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://127.0.0.1:5000
-```
-
-เมื่อเริ่มทำงาน ระบบจะแสดง URL ที่ลงท้ายด้วย `trycloudflare.com` ให้คัดลอก URL นี้ไว้
-
-### 3. ตั้งค่า Backend URL ใน Vercel
-
-1. เข้าโปรเจกต์ใน Vercel
-2. ไปที่ **Settings → Environment Variables**
-3. กำหนดค่า Backend API URL โดยใช้ชื่อตัวแปรที่ Frontend อ่านจริงจาก Source Code
-4. ใส่ URL จาก Cloudflare Quick Tunnel
-5. บันทึกค่าและ Redeploy โปรเจกต์
-
-> **ข้อควรทราบ:** Quick Tunnel เป็น URL ชั่วคราว เมื่อเริ่ม Tunnel ใหม่ URL อาจเปลี่ยน หากเปลี่ยน URL ต้องแก้ค่าใน Vercel และ Redeploy อีกครั้ง
-
-### 4. ตั้งค่า CORS ใน Backend
-
-Backend ต้องอนุญาตให้โดเมน Frontend เรียก API ได้ ตัวอย่างแนวทางการตั้งค่าใน Flask
-
-```python
-from flask_cors import CORS
-
-CORS(
-    app,
-    resources={
-        r"/*": {
-            "origins": [
-                "http://localhost:3000",
-                "https://luna-day-health.vercel.app"
-            ],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    }
-)
-```
-
-เปลี่ยน `https://luna-day-health.vercel.app` ให้เป็น Production Domain จริงของโปรเจกต์ จากนั้น Restart Backend
-
-### ข้อจำกัดของการใช้งานออนไลน์
-
-- ต้องเปิดเครื่อง Windows และเชื่อมต่ออินเทอร์เน็ตตลอดเวลาที่ใช้งาน Backend
-- ต้องเปิดหน้าต่าง Backend และ Cloudflare Tunnel ค้างไว้
-- Quick Tunnel ใช้ URL ชั่วคราว ไม่รับประกันว่าจะได้ URL เดิมทุกครั้ง
-- เมื่อ URL เปลี่ยน ต้องอัปเดตค่าใน Vercel และ Redeploy
-- หากเครื่องหรือ Tunnel หยุดทำงาน ฟังก์ชันที่เรียก Backend จะใช้งานไม่ได้
-
-[กลับไปสารบัญ](#สารบัญ)
-
-## การทดสอบระบบ
-
-### Localhost
-
-- [ ] MySQL Server ทำงาน
-- [ ] Backend เปิดที่ `localhost:5000`
-- [ ] Frontend เปิดที่ `localhost:3000`
+- [ ] Docker Containers ทั้ง 3 บริการเริ่มทำงาน
+- [ ] เปิดเว็บไซต์ผ่าน `http://localhost:3000` ได้
+- [ ] Backend ตอบกลับที่ `http://localhost:5000/`
+- [ ] Backend เชื่อมต่อฐานข้อมูล MySQL ได้
 - [ ] สมัครสมาชิกและเข้าสู่ระบบได้
-- [ ] เปิดบทความสุขภาพได้
+- [ ] ระบบส่งและยืนยัน OTP ได้ (เมื่อกำหนดค่า Gmail แล้ว)
+- [ ] เปิดอ่านบทความสุขภาพได้
 - [ ] อัปโหลดภาพเพื่อวิเคราะห์ได้
-- [ ] ตอบแบบสอบถามและดูผลประเมินได้
-- [ ] ดูประวัติการวิเคราะห์ได้
+- [ ] ระบบเรียกใช้งาน AI Model ได้
+- [ ] แสดงผลการประเมินและประวัติการวิเคราะห์ได้
 - [ ] ดูและแก้ไขข้อมูลโปรไฟล์ได้
 
-### Vercel + Cloudflare Quick Tunnel
+หากพบปัญหา สามารถตรวจสอบ Log ของแต่ละ Container เพื่อดูรายละเอียดข้อผิดพลาดได้
 
-- [ ] เครื่อง Windows เชื่อมต่ออินเทอร์เน็ต
-- [ ] MySQL และ Backend ทำงาน
-- [ ] Cloudflare Quick Tunnel ทำงาน
-- [ ] ตั้งค่า Backend URL ใน Vercel ถูกต้อง
-- [ ] Redeploy หลังเปลี่ยน Environment Variables
-- [ ] CORS อนุญาต Production Domain
-- [ ] เปิดเว็บไซต์ผ่าน Vercel ได้
-- [ ] ทดสอบ API และฟังก์ชันหลักได้
+---
 
-สามารถกด `F12` ใน Browser แล้วเลือกแท็บ **Network** เพื่อตรวจสอบ Request และ Status Code ของ API ได้
+## การหยุดและเริ่มระบบใหม่
+
+### หยุดระบบ
+
+```powershell
+docker compose --env-file .env.docker down
+```
+
+คำสั่งนี้จะหยุดและลบ Containers กับ Network ของ Compose แต่ **ไม่ลบ Docker Volume ที่เก็บข้อมูล MySQL** ทำให้ข้อมูลฐานข้อมูลยังคงอยู่
+
+### เริ่มระบบอีกครั้ง
+
+```powershell
+docker compose --env-file .env.docker up -d
+```
+
+### หยุด Containers ชั่วคราว
+
+```powershell
+docker compose --env-file .env.docker stop
+```
+
+### เริ่ม Containers ที่หยุดไว้
+
+```powershell
+docker compose --env-file .env.docker start
+```
+
+> **คำเตือน:** ไม่ควรใช้ `docker compose down -v` หากต้องการเก็บข้อมูลฐานข้อมูลไว้ เพราะตัวเลือก `-v` จะลบ Volume ที่เกี่ยวข้องกับ Compose ด้วย
+
+### หมายเหตุเกี่ยวกับการนำเข้าฐานข้อมูล
+
+Docker Compose กำหนดให้ MySQL นำเข้าไฟล์ `database/Dump_Lunar_Docker.sql` เมื่อเริ่มต้นใช้งานครั้งแรกและ Data Directory ยังว่างอยู่เท่านั้น
+
+หากมี MySQL Volume เดิมอยู่แล้ว การแก้ไขไฟล์ SQL Dump หรือสั่ง Build ใหม่จะไม่ทำให้ MySQL นำเข้าข้อมูลใหม่โดยอัตโนมัติ
+
+---
 
 [กลับไปสารบัญ](#สารบัญ)
 
@@ -594,19 +456,20 @@ Authorization: Bearer <token>
 
 ## การแก้ไขปัญหา
 
-| ปัญหา | วิธีตรวจสอบ |
+| ปัญหา | วิธีตรวจสอบ / แนวทางแก้ไข |
 |---|---|
-| Frontend เชื่อมต่อ Backend ไม่ได้ | ตรวจว่า Backend ทำงานและ API URL ถูกต้อง |
-| เชื่อมต่อ MySQL ไม่ได้ | ตรวจค่า DB ใน `.env` และสถานะ MySQL |
-| ไม่พบ AI Model | ตรวจว่า `incep_exp12.pth` อยู่ใน `backend/` |
-| ไม่ได้รับ OTP | ตรวจ Gmail และ App Password รวมถึง Spam |
-| ติดตั้ง PyTorch ไม่สำเร็จ | ตรวจเวอร์ชัน Python และวิธีติดตั้งจาก [PyTorch](https://pytorch.org/get-started/locally/) |
-| พอร์ต 3000 ใช้งานไม่ได้ | ลองเปลี่ยนเป็นพอร์ต 3001 |
-| Vercel เรียก API ไม่ได้ | ตรวจ Backend URL และ Redeploy |
-| เกิด CORS Error | ตรวจ Origin ใน Flask ให้ตรงกับโดเมน Vercel |
-| Cloudflare Tunnel ใช้งานไม่ได้ | ตรวจ Backend และสถานะหน้าต่าง Tunnel |
-| URL Tunnel เปลี่ยน | อัปเดต URL ใน Vercel แล้ว Redeploy |
-| รูปภาพไม่แสดง | ตรวจ URL รูปภาพและค่า `SERVER_URL` |
+| Docker ไม่ทำงาน | เปิด Docker Desktop และรอให้ Docker Engine พร้อมใช้งาน |
+| คำสั่ง `docker` ไม่พบ | ตรวจสอบการติดตั้ง Docker Desktop และเปิด PowerShell ใหม่ |
+| Build ไม่สำเร็จ | ตรวจสอบอินเทอร์เน็ต, Dockerfile และ Log ของขั้นตอน Build |
+| Frontend เชื่อมต่อ Backend ไม่ได้ | ตรวจสอบ Backend URL และ Log ของ Frontend/Backend |
+| Backend เชื่อมต่อ MySQL ไม่ได้ | ตรวจสอบค่า Environment Variables และสถานะ MySQL |
+| MySQL ไม่เริ่มทำงาน | ตรวจสอบ Log ของ MySQL และค่า `MYSQL_ROOT_PASSWORD` |
+| ไม่พบ AI Model | ตรวจสอบว่า `incep_exp12.pth` อยู่ใน `backend/` และถูกนำเข้าใน Build Context |
+| ไม่ได้รับ OTP | ตรวจสอบ Gmail, App Password และโฟลเดอร์ Spam |
+| พอร์ต 3000 หรือ 5000 ถูกใช้งาน | ปิดโปรแกรมที่ใช้พอร์ตดังกล่าว หรือปรับ Port Mapping ให้เหมาะสม |
+| ข้อมูลฐานข้อมูลไม่เปลี่ยนตาม SQL Dump | ตรวจสอบว่า MySQL Volume มีข้อมูลเดิมอยู่หรือไม่ |
+| รูปภาพไม่แสดง | ตรวจสอบ URL รูปภาพและค่า `SERVER_URL` |
+
 
 [กลับไปสารบัญ](#สารบัญ)
 
