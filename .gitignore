@@ -4,7 +4,9 @@ Thumbs.db
 
 # --- Environment Variables ---
 .env
+.env.docker
 backend/.env
+
 
 # --- Backend (Python/Flask) ---
 __pycache__/
@@ -19,6 +21,7 @@ backend/env/
 
 # --- Database ---
 *.sql
+!database/Dump_Lunar_Docker.sql
 
 # --- Frontend / Node ---
 node_modules/
