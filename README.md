@@ -1,20 +1,13 @@
-
 <div align="center">
 
-# 🌙 Lunar Day
+<h1>  <img src="docs/images/logo.png" width="55" valign="middle" style="border-radius: 10%; alt="Lunar Day Logo">  Lunar Day </h1>
 
-### AI-Powered Menstrual Health Analysis
+เว็บแอปพลิเคชันสำหรับประเมินความเสี่ยงเบื้องต้น<br>
+จากภาพลิ่มเลือดประจำเดือนด้วยเทคโนโลยีปัญญาประดิษฐ์และการเรียนรู้เชิงลึก
 
-เว็บแอปพลิเคชันสำหรับประเมินความเสี่ยงเบื้องต้นจากภาพลิ่มเลือดประจำเดือน
-ด้วยเทคโนโลยีปัญญาประดิษฐ์และการเรียนรู้เชิงลึก
-
-![Lunar Day Banner](docs/images/bannerlunar.png)
-
-**ดูแลสุขภาพสตรีด้วย AI เพื่อความเข้าใจสุขภาพประจำเดือนที่ดียิ่งขึ้น**
-
+<img src="docs/images/bannerlunar.png" width="100%" alt="Lunar Day Banner">
 </div>
 
----
 
 ## 📑 สารบัญ
 
@@ -31,10 +24,10 @@
 - [ข้อควรระวัง](#ข้อควรระวัง)
 - [Contributing](#contributing)
 
----
 
 
----
+
+
 
 ## เกี่ยวกับโปรเจกต์
 
